@@ -1,0 +1,83 @@
+app: ridehailing
+state: idea
+rules:
+  - id: REQ-1
+    statement: WHEN a rider requests a ride, THE SYSTEM SHALL show the fare estimate before the request is confirmed.
+    status: confirmed
+    revision: 1
+    required: true
+    rationale: Standard practice; avoids surprise charges.
+    source:
+      kind: stakeholder
+      ref: "app owner, chat review 2026-11-04"
+    decided_by: app owner (chandrafirst67)
+    decided_on: 2026-11-04
+    scenarios:
+      - kind: required
+        name: estimate shown
+        given: rider picked pickup and destination
+        when: rider opens the request screen
+        then: estimated fare is shown before they can confirm
+      - kind: forbidden
+        name: confirm without estimate
+        given: fare estimate unavailable
+        when: rider tries to confirm
+        then: request is blocked, not sent with an unknown fare
+
+  - id: REQ-2
+    statement: WHEN a rider already has an active ride, THE SYSTEM SHALL reject a second ride request from that rider.
+    status: confirmed
+    revision: 1
+    required: true
+    rationale: Prevents duplicate or overlapping trips; may be too strict (e.g. booking for a friend).
+    source:
+      kind: stakeholder
+      ref: "app owner, chat review 2026-11-04"
+    decided_by: app owner (chandrafirst67)
+    decided_on: 2026-11-04
+    scenarios:
+      - kind: required
+        name: first request accepted
+        given: rider has no active ride
+        when: rider requests a ride
+        then: request is created
+      - kind: forbidden
+        name: duplicate request
+        given: rider has an active ride
+        when: rider requests another
+        then: rejected, existing ride unchanged
+
+  - id: MATCH-1
+    statement: THE SYSTEM SHALL NOT offer one ride request to more than one driver at the same time.
+    status: confirmed
+    revision: 1
+    required: true
+    rationale: Avoids two drivers accepting the same ride. Uber-style sequential dispatch.
+    source:
+      kind: stakeholder
+      ref: "app owner, chat review 2026-11-04"
+    decided_by: app owner (chandrafirst67)
+    decided_on: 2026-11-04
+    scenarios:
+      - kind: required
+        name: sequential offers
+        given: three nearby drivers
+        when: first driver declines or times out
+        then: offer goes to the next driver
+      - kind: forbidden
+        name: double accept
+        given: two drivers see the same request
+        when: both accept
+        then: only one is assigned
+
+  - id: CANCEL-1
+    statement: Can a rider cancel for free, and until when? Is there a fee after a driver is assigned or arrives?
+    status: open
+
+  - id: PAY-1
+    statement: When is the rider charged (at request, at end of trip), and what happens if payment fails?
+    status: open
+
+  - id: SAFE-1
+    statement: What must a driver have verified (license, vehicle, background check) before receiving rides?
+    status: open
