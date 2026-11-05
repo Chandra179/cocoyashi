@@ -4,14 +4,14 @@ rules:
   - id: REQ-1
     statement: WHEN a rider requests a ride, THE SYSTEM SHALL show the fare estimate before the request is confirmed.
     status: confirmed
-    revision: 1
+    revision: 2
     required: true
     rationale: Standard practice; avoids surprise charges.
     source:
       kind: stakeholder
       ref: "app owner, chat review 2026-11-04"
     decided_by: app owner (chandrafirst67)
-    decided_on: 2026-11-04
+    decided_on: 2026-11-05
     scenarios:
       - kind: required
         name: estimate shown
@@ -23,18 +23,22 @@ rules:
         given: fare estimate unavailable
         when: rider tries to confirm
         then: request is blocked, not sent with an unknown fare
+    check:
+      method: test
+      ref: tests/test_estimate.py
+      strength: sampled
 
   - id: REQ-2
     statement: WHEN a rider already has an active ride, THE SYSTEM SHALL reject a second ride request from that rider.
     status: confirmed
-    revision: 1
+    revision: 2
     required: true
     rationale: Prevents duplicate or overlapping trips; may be too strict (e.g. booking for a friend).
     source:
       kind: stakeholder
       ref: "app owner, chat review 2026-11-04"
     decided_by: app owner (chandrafirst67)
-    decided_on: 2026-11-04
+    decided_on: 2026-11-05
     scenarios:
       - kind: required
         name: first request accepted
@@ -46,18 +50,22 @@ rules:
         given: rider has an active ride
         when: rider requests another
         then: rejected, existing ride unchanged
+    check:
+      method: test
+      ref: tests/test_active_ride.py
+      strength: sampled
 
   - id: MATCH-1
     statement: THE SYSTEM SHALL NOT offer one ride request to more than one driver at the same time.
     status: confirmed
-    revision: 1
+    revision: 2
     required: true
     rationale: Avoids two drivers accepting the same ride. Uber-style sequential dispatch.
     source:
       kind: stakeholder
       ref: "app owner, chat review 2026-11-04"
     decided_by: app owner (chandrafirst67)
-    decided_on: 2026-11-04
+    decided_on: 2026-11-05
     scenarios:
       - kind: required
         name: sequential offers
@@ -69,11 +77,15 @@ rules:
         given: two drivers see the same request
         when: both accept
         then: only one is assigned
+    check:
+      method: test
+      ref: tests/test_dispatch_concurrency.py
+      strength: bounded
 
   - id: CANCEL-1
     statement: WHEN a rider cancels before a driver accepts, or within a short grace period of 2 minutes after a driver accepts, THE SYSTEM SHALL charge no cancellation fee. The grace period length SHALL be a configuration value, not hard-coded.
     status: confirmed
-    revision: 1
+    revision: 2
     required: true
     rationale: Modelled on Uber's typical policy. The grace length is an assumption; Uber varies it by market.
     source:
@@ -97,11 +109,15 @@ rules:
         given: no driver assigned, or still inside the grace period
         when: rider cancels
         then: any fee is charged
+    check:
+      method: test
+      ref: tests/test_cancel_grace.py
+      strength: bounded
 
   - id: CANCEL-2
     statement: WHEN a rider cancels after the grace period once a driver is assigned, THE SYSTEM SHALL charge a flat cancellation fee of $5, paid to the driver, and show the fee to the rider before they confirm the cancel. The fee amount SHALL be a configuration value, not hard-coded.
     status: confirmed
-    revision: 1
+    revision: 2
     required: true
     rationale: Modelled on Uber's typical policy. The fee amount and whether it varies by market are not decided.
     source:
@@ -120,11 +136,15 @@ rules:
         given: a fee will apply
         when: rider taps cancel
         then: cancel completes without first showing the fee
+    check:
+      method: test
+      ref: tests/test_cancel_fee.py
+      strength: bounded
 
   - id: PAY-1
     statement: WHEN a rider requests a ride, THE SYSTEM SHALL verify the payment method and hold the estimated fare, and WHEN the trip ends, THE SYSTEM SHALL charge the final fare.
     status: confirmed
-    revision: 1
+    revision: 2
     required: true
     rationale: Modelled on Uber's typical flow (pre-authorize at request, charge at end of trip). Not decided whether a hold or only a card check is used.
     source:
@@ -143,11 +163,15 @@ rules:
         given: trip completed and already charged
         when: charge is retried
         then: rider is charged a second time
+    check:
+      method: test
+      ref: tests/test_charge_once.py
+      strength: sampled
 
   - id: PAY-2
     statement: WHEN a rider's payment fails, THE SYSTEM SHALL record an outstanding balance on the rider and block new ride requests until it is paid, and THE SYSTEM SHALL still pay the driver in full.
     status: confirmed
-    revision: 1
+    revision: 2
     required: true
     rationale: Platform bears the loss; matches Uber, Grab and Gojek. Decided 2026-11-05.
     source:
@@ -166,10 +190,15 @@ rules:
         given: rider payment failed
         when: trip is settled
         then: driver receives nothing
+    check:
+      method: test
+      ref: tests/test_failed_payment.py
+      strength: sampled
+
   - id: CANCEL-3
     statement: WHEN the driver has arrived and the rider has not shown up within 5 minutes, THE SYSTEM SHALL let the driver cancel and charge the rider the same flat fee as CANCEL-2 ($5), credited to the driver. The waiting time and fee SHALL be configuration values.
     status: confirmed
-    revision: 1
+    revision: 2
     required: true
     rationale: Same fee as CANCEL-2. Decided 2026-11-05.
     source:
@@ -188,10 +217,15 @@ rules:
         given: driver arrived and waiting time has not passed
         when: driver cancels as no-show
         then: rider is charged
+    check:
+      method: test
+      ref: tests/test_no_show_fee.py
+      strength: bounded
+
   - id: SAFE-1
     statement: THE SYSTEM SHALL NOT offer rides to a driver unless the driver has a valid driver license, valid vehicle documents (registration, insurance, inspection), a passed background check, and an ID and photo match (re-checked by selfie on login).
     status: confirmed
-    revision: 1
+    revision: 2
     required: true
     rationale: Rider safety. Decided 2026-11-05.
     source:
@@ -215,11 +249,15 @@ rules:
         given: any of license, vehicle documents, background check or ID/photo match is missing, failed or expired
         when: driver goes online
         then: driver receives a ride offer
+    check:
+      method: review
+      ref: reviews/driver_verification.md
+      strength: human
 
   - id: FARE-1
     statement: THE SYSTEM SHALL charge the rider exactly the upfront fare shown before the request was confirmed (REQ-1), except in these cases only. (a) WHEN the rider changes the destination or adds a stop in the app, THE SYSTEM SHALL show a new price and apply it only after the rider confirms it. (b) Actual tolls not in the estimate are added. (c) The pickup waiting fee (CANCEL-3 wait time) is added. (d) WHEN the route or duration differs significantly from the estimate beyond a configured threshold, or the rider changes the route without updating the app, THE SYSTEM SHALL charge by actual time and distance. The threshold SHALL be a configuration value.
     status: confirmed
-    revision: 1
+    revision: 2
     required: true
     rationale: Owner chose an upfront fixed price with Uber's exceptions on 2026-11-05. Detour threshold is configurable and still to be set.
     source:
@@ -249,11 +287,15 @@ rules:
         given: no change by the rider and the trip is within the detour threshold
         when: trip takes longer than estimated
         then: rider is charged more than the upfront fare
+    check:
+      method: test
+      ref: tests/test_upfront_fare.py
+      strength: sampled
 
   - id: DCANCEL-1
     statement: WHEN a driver cancels after accepting a ride, THE SYSTEM SHALL charge the rider no fee and SHALL automatically re-dispatch the request to the next available driver (MATCH-1 still applies), and SHALL tell the rider.
     status: confirmed
-    revision: 1
+    revision: 2
     required: true
     rationale: Owner asked for Uber's behavior on 2026-11-05. Uber re-dispatches without a fee when the driver cancels. If the driver cancelled after waiting at pickup past the wait time, that is a no-show and CANCEL-3 applies instead.
     source:
@@ -273,11 +315,15 @@ rules:
         given: driver cancelled before the no-show wait time
         when: the ride is closed
         then: rider is charged any fee
+    check:
+      method: test
+      ref: tests/test_driver_cancel.py
+      strength: sampled
 
   - id: DCANCEL-2
     statement: THE SYSTEM SHALL track each driver's cancellation rate (cancelled accepted rides out of accepted rides) and SHALL warn the driver, then deactivate the driver, WHEN the rate stays above a configured per-city maximum. The maximum SHALL be a configuration value.
     status: confirmed
-    revision: 1
+    revision: 2
     required: false
     rationale: Uber's deactivation policy limits cancellation rate per city. Maximum, review window and warning steps are not decided. Whether the rate counts accepted or assigned trips is unsettled in sources.
     source:
@@ -296,11 +342,15 @@ rules:
         given: a driver cancels because the rider did not show up within the wait time
         when: the rate is computed
         then: that cancel counts against the driver
+    check:
+      method: test
+      ref: tests/test_driver_cancel_rate.py
+      strength: sampled
 
   - id: SURGE-1
     statement: WHEN demand raises prices, THE SYSTEM SHALL include the increase in the upfront fare shown before confirming, with a notice that fares are higher due to demand, and SHALL NOT raise the fare after the rider confirms it (FARE-1 exceptions aside). A maximum surge cap SHALL be a configuration value.
     status: confirmed
-    revision: 1
+    revision: 2
     required: true
     rationale: Uber folds surge into one upfront price instead of showing a multiplier. A surge cap and an emergency cap are not decided.
     source:
@@ -320,11 +370,15 @@ rules:
         given: rider confirmed an upfront fare
         when: demand rises before the trip ends
         then: the fare increases
+    check:
+      method: test
+      ref: tests/test_surge_fare.py
+      strength: sampled
 
   - id: REFUND-1
     statement: WHEN a rider reports a fare charged in error, a trip that ended well short of the requested destination, or a trip the driver did not end in the app, THE SYSTEM SHALL review the report and refund the difference or the whole fare when it is upheld. The reporting window and what counts as short of the destination SHALL be configuration values.
     status: confirmed
-    revision: 1
+    revision: 2
     required: true
     rationale: Uber's refund policy lists these cases (page last modified 2020, may be outdated). A 30-day window appears only in third-party sources and is unverified.
     source:
@@ -343,11 +397,15 @@ rules:
         given: rider reports after the window
         when: the report is submitted
         then: it is dropped with no reply
+    check:
+      method: test
+      ref: tests/test_refund_report.py
+      strength: sampled
 
   - id: TRIP-1
     statement: WHEN a trip ends before the requested destination, or the driver goes offline mid-trip, THE SYSTEM SHALL charge only for the part completed, tell the rider, and keep the rider's safety information available. WHEN the driver fails to end a finished trip, THE SYSTEM SHALL end it automatically and SHALL NOT charge above the upfront fare because of it.
     status: confirmed
-    revision: 1
+    revision: 2
     required: true
     rationale: Uber says drivers must end trips in the app, and riders have been overcharged when they do not. Partial-trip pricing and rider-safety handling (support contact, re-dispatch to finish the trip) are not decided.
     source:
@@ -367,11 +425,15 @@ rules:
         given: driver reached the destination but did not end the trip
         when: the fare is computed
         then: rider is charged more than the upfront fare
+    check:
+      method: test
+      ref: tests/test_trip_end.py
+      strength: sampled
 
   - id: RATE-1
     statement: WHEN a trip ends, THE SYSTEM SHALL let the rider and the driver each rate the other, and SHALL show a person only their own average. WHEN a rider's or driver's average stays below a configured per-city threshold, THE SYSTEM SHALL first notify them with tips to improve, and only then deactivate the account. The threshold and the rating window SHALL be configuration values.
     status: confirmed
-    revision: 1
+    revision: 2
     required: false
     rationale: Uber rates both sides and deactivates low-rated riders and drivers after warnings, with thresholds set per city. Uber does not publish the numbers (4.6 for drivers is from leaked documents, unconfirmed). Rating window not found.
     source:
@@ -390,11 +452,15 @@ rules:
         given: average is below the city threshold and no warning was sent
         when: the review runs
         then: the account is deactivated
+    check:
+      method: test
+      ref: tests/test_rating_warning.py
+      strength: sampled
 
   - id: SAFE-2
     statement: DURING a trip, THE SYSTEM SHALL let the rider share live trip status with trusted contacts, shall give the rider an in-app way to call local emergency services, and SHALL check on the rider when the trip stops unexpectedly for a long time or goes far off-route.
     status: confirmed
-    revision: 1
+    revision: 2
     required: true
     rationale: Uber offers Share My Trip, an emergency button and RideCheck, which varies by country. Long-stop time, off-route distance and who gets alerted are not decided.
     source:
@@ -418,3 +484,7 @@ rules:
         given: a trip in progress
         when: rider looks for emergency help
         then: no in-app way to reach emergency services exists
+    check:
+      method: test
+      ref: tests/test_trip_safety.py
+      strength: sampled
