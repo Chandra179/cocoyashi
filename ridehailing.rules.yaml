@@ -519,12 +519,15 @@ rules:
 
   - id: PRIV-1
     statement: THE SYSTEM SHALL route calls and messages between rider and driver through the app so neither sees the other's real phone number, and SHALL show a driver only a broader area, not exact pickup and drop-off addresses, in the driver's trip history after the trip.
-    status: proposed
+    status: confirmed
     revision: 1
+    required: true
     rationale: Owner chose "as Uber" on 2026-11-05. Uber masks phone numbers and obscures addresses in driver history. How long exact addresses are kept for safety and disputes is not decided.
     source:
       kind: stakeholder
       ref: "app owner, chat 2026-11-05 (as Uber)"
+    decided_by: app owner (chandrafirst67)
+    decided_on: 2026-11-05
     scenarios:
       - kind: required
         name: masked call
@@ -536,15 +539,22 @@ rules:
         given: a completed trip
         when: the driver opens their trip history
         then: the exact pickup or drop-off address is shown
+    check:
+      method: test
+      ref: tests/test_privacy_masking.py
+      strength: sampled
 
   - id: MATCH-2
     statement: WHEN a driver is offered a ride, THE SYSTEM SHALL give the driver 15 seconds to accept, and WHEN the driver declines or the time runs out, THE SYSTEM SHALL offer the ride to the next driver (MATCH-1 still applies). The accept time SHALL be a configuration value, default 15 seconds.
-    status: proposed
+    status: confirmed
     revision: 1
+    required: true
     rationale: Uber publishes no figure; third-party sources say about 10 to 15 seconds. Owner chose 15 seconds on 2026-11-05.
     source:
       kind: stakeholder
       ref: "app owner, chat 2026-11-05"
+    decided_by: app owner (chandrafirst67)
+    decided_on: 2026-11-05
     depends_on: [MATCH-1]
     scenarios:
       - kind: required
@@ -557,15 +567,22 @@ rules:
         given: the offer has timed out and gone to another driver
         when: the first driver taps accept
         then: the first driver is assigned the ride
+    check:
+      method: test
+      ref: tests/test_offer_timer.py
+      strength: bounded
 
   - id: MATCH-3
     statement: WHEN a driver declines or ignores several offers in a row, THE SYSTEM SHALL take the driver offline for a short timeout. The number of offers and the timeout length SHALL be configuration values, defaults 3 offers and 5 minutes. A timeout SHALL NOT start for offers that closed because another driver was assigned.
-    status: proposed
+    status: confirmed
     revision: 1
+    required: true
     rationale: Uber can time out drivers who ignore requests (reports say 2 to 30 minutes by city) and the practice is criticised. Owner chose "short timeout" on 2026-11-05. The defaults 3 offers and 5 minutes are my assumptions, not Uber figures.
     source:
       kind: stakeholder
       ref: "app owner, chat 2026-11-05 (short timeout)"
+    decided_by: app owner (chandrafirst67)
+    decided_on: 2026-11-05
     depends_on: [MATCH-2]
     scenarios:
       - kind: required
@@ -578,15 +595,22 @@ rules:
         given: an offer closed because another driver was assigned
         when: the driver's streak is counted
         then: that offer counts as ignored
+    check:
+      method: test
+      ref: tests/test_ignored_offers.py
+      strength: bounded
 
   - id: EARN-1
     statement: THE SYSTEM SHALL keep 20% of each completed trip's fare as commission and pay the remainder to the driver weekly, and SHALL offer an optional instant cash-out for a fee. The commission rate, payout day and instant cash-out fee SHALL be configuration values, settable per market. The commission SHALL NOT exceed any legal maximum for the market.
-    status: proposed
+    status: confirmed
     revision: 1
+    required: true
     rationale: Owner chose 20% and weekly payout on 2026-11-05. Third-party sources put Uber's cut at roughly 25 to 30%, and Indonesia recently ordered a maximum commission of 8%, so the legal cap is a real constraint. Payout day and instant cash-out fee are not decided. PAY-2 already requires the driver be paid if the rider's payment fails.
     source:
       kind: stakeholder
       ref: "app owner, chat 2026-11-05"
+    decided_by: app owner (chandrafirst67)
+    decided_on: 2026-11-05
     depends_on: [PAY-2]
     scenarios:
       - kind: required
@@ -599,3 +623,74 @@ rules:
         given: a market has a legal maximum commission
         when: a trip is settled
         then: commission above the maximum is taken
+    check:
+      method: test
+      ref: tests/test_commission_payout.py
+      strength: sampled
+
+  - id: PAYM-1
+    statement: THE SYSTEM SHALL accept credit and debit cards, mobile wallets (Apple Pay, Google Pay) and cash, and WHEN a rider's card is expired or declined, THE SYSTEM SHALL ask for another method before a ride can be requested. WHEN a rider pays cash, THE SYSTEM SHALL record the fare as paid to the driver and the commission as owed by the driver to the platform.
+    status: proposed
+    revision: 1
+    rationale: Owner chose cards, wallets and cash on 2026-11-05. Uber accepts cards and wallets, varying by location, and I found nothing on expired cards or cash. Cash conflicts with PAY-1 (hold at request) and PAY-2 (unpaid balance on the rider), which assume a digital payment. How cash commission is collected and what happens to an unpaid cash fare are not decided.
+    source:
+      kind: stakeholder
+      ref: "app owner, chat 2026-11-05"
+    depends_on: [PAY-1, PAY-2, EARN-1]
+    scenarios:
+      - kind: required
+        name: expired card
+        given: the rider's only method is an expired card
+        when: rider requests a ride
+        then: the request is blocked and the rider is asked for another method
+      - kind: required
+        name: cash trip
+        given: a trip paid in cash
+        when: the trip ends
+        then: the commission is recorded as owed by the driver
+      - kind: forbidden
+        name: hold on a cash trip
+        given: the rider chose cash
+        when: the rider requests a ride
+        then: a card hold is placed
+
+  - id: PROMO-1
+    statement: WHEN a rider enters a promo code before the trip, THE SYSTEM SHALL apply it to the base fare and fees but not to tips, SHALL honour any city limit on the code, and SHALL grant referral credit to a rider who invites a friend who completes a first trip. Credit amounts and whether codes combine SHALL be configuration values.
+    status: proposed
+    revision: 1
+    rationale: Owner chose "as Uber" on 2026-11-05. Uber codes are entered before the trip, do not reduce tips, and can be limited by city. Referral rules, stacking, expiry, and whether the platform or the driver bears the discount are not decided. A discount must not reduce the driver's pay unless decided (see EARN-1).
+    source:
+      kind: stakeholder
+      ref: "app owner, chat 2026-11-05 (as Uber)"
+    depends_on: [FARE-1, EARN-1]
+    scenarios:
+      - kind: required
+        name: promo applied
+        given: a valid code entered before the trip
+        when: the trip ends
+        then: the discount applies to fare and fees and not to the tip
+      - kind: forbidden
+        name: code outside its city
+        given: a code limited to another city
+        when: rider enters it
+        then: the discount is applied
+
+  - id: ACCESS-1
+    statement: THE SYSTEM SHALL let a rider flag that they travel with a service or assistance animal, SHALL treat a driver's refusal of such a rider as a violation that can end the driver's access, SHALL send the rider an in-app message when a driver cancels such a trip, and SHALL offer a wheelchair-accessible vehicle option.
+    status: proposed
+    revision: 1
+    rationale: Owner chose "as Uber" on 2026-11-05. Uber treats refusal as illegal and against policy, but news reports show drivers still cancel on riders with service dogs. How a refusal is detected, the penalty ladder, and where a wheelchair-accessible vehicle is available are not decided.
+    source:
+      kind: stakeholder
+      ref: "app owner, chat 2026-11-05 (as Uber)"
+    scenarios:
+      - kind: required
+        name: flagged animal cancel
+        given: a rider flagged an assistance animal
+        when: the driver cancels
+        then: the rider gets an in-app message and the cancel is reviewed
+      - kind: forbidden
+        name: no fee after refusal
+        given: a driver refused a rider with a service animal
+        when: the trip closes
+        then: the rider is charged any cancellation fee
