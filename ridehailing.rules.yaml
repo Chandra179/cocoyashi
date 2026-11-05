@@ -1,696 +1,718 @@
 app: ridehailing
 state: idea
 rules:
-  - id: REQ-1
-    statement: WHEN a rider requests a ride, THE SYSTEM SHALL show the fare estimate before the request is confirmed.
-    status: confirmed
-    revision: 2
-    required: true
-    rationale: Standard practice; avoids surprise charges.
-    source:
-      kind: stakeholder
-      ref: "app owner, chat review 2026-11-04"
-    decided_by: app owner (chandrafirst67)
-    decided_on: 2026-11-05
-    scenarios:
-      - kind: required
-        name: estimate shown
-        given: rider picked pickup and destination
-        when: rider opens the request screen
-        then: estimated fare is shown before they can confirm
-      - kind: forbidden
-        name: confirm without estimate
-        given: fare estimate unavailable
-        when: rider tries to confirm
-        then: request is blocked, not sent with an unknown fare
-    check:
-      method: test
-      ref: tests/test_estimate.py
-      strength: sampled
-
-  - id: REQ-2
-    statement: WHEN a rider already has an active ride, THE SYSTEM SHALL reject a second ride request from that rider.
-    status: confirmed
-    revision: 2
-    required: true
-    rationale: Prevents duplicate or overlapping trips; may be too strict (e.g. booking for a friend).
-    source:
-      kind: stakeholder
-      ref: "app owner, chat review 2026-11-04"
-    decided_by: app owner (chandrafirst67)
-    decided_on: 2026-11-05
-    scenarios:
-      - kind: required
-        name: first request accepted
-        given: rider has no active ride
-        when: rider requests a ride
-        then: request is created
-      - kind: forbidden
-        name: duplicate request
-        given: rider has an active ride
-        when: rider requests another
-        then: rejected, existing ride unchanged
-    check:
-      method: test
-      ref: tests/test_active_ride.py
-      strength: sampled
-
-  - id: MATCH-1
-    statement: THE SYSTEM SHALL NOT offer one ride request to more than one driver at the same time.
-    status: confirmed
-    revision: 3
-    required: true
-    rationale: Avoids two drivers accepting the same ride. Uber-style sequential dispatch.
-    source:
-      kind: stakeholder
-      ref: "app owner, chat review 2026-11-04"
-    decided_by: app owner (chandrafirst67)
-    decided_on: 2026-11-05
-    scenarios:
-      - kind: required
-        name: sequential offers
-        given: three nearby drivers
-        when: first driver declines or times out
-        then: offer goes to the next driver
-      - kind: forbidden
-        name: double accept
-        given: two drivers see the same request
-        when: both accept
-        then: only one is assigned
-    check:
-      method: assertion
-      ref: dispatch assertion - at most one open offer per ride request (planned)
-      strength: sampled
-
-  - id: CANCEL-1
-    statement: WHEN a rider cancels before a driver accepts, or within a short grace period of 2 minutes after a driver accepts, THE SYSTEM SHALL charge no cancellation fee. The grace period length SHALL be a configuration value, not hard-coded.
-    status: confirmed
-    revision: 2
-    required: true
-    rationale: Modelled on Uber's typical policy. The grace length is an assumption; Uber varies it by market.
-    source:
-      kind: stakeholder
-      ref: "app owner, chat 2026-11-05 (grace period 2 minutes, configurable)"
-    decided_by: app owner (chandrafirst67)
-    decided_on: 2026-11-05
-    scenarios:
-      - kind: required
-        name: free cancel before acceptance
-        given: no driver has accepted the request
-        when: rider cancels
-        then: request is cancelled and no fee is charged
-      - kind: required
-        name: free cancel inside grace period
-        given: a driver accepted less than the grace period ago
-        when: rider cancels
-        then: no fee is charged
-      - kind: forbidden
-        name: fee inside free window
-        given: no driver assigned, or still inside the grace period
-        when: rider cancels
-        then: any fee is charged
-    check:
-      method: test
-      ref: tests/test_cancel_grace.py
-      strength: bounded
-
-  - id: CANCEL-2
-    statement: WHEN a rider cancels after the grace period once a driver is assigned, THE SYSTEM SHALL charge a flat cancellation fee of $5, paid to the driver, and show the fee to the rider before they confirm the cancel. The fee amount SHALL be a configuration value, not hard-coded.
-    status: confirmed
-    revision: 2
-    required: true
-    rationale: Modelled on Uber's typical policy. The fee amount and whether it varies by market are not decided.
-    source:
-      kind: stakeholder
-      ref: "app owner, chat 2026-11-05 (flat $5, configurable)"
-    decided_by: app owner (chandrafirst67)
-    decided_on: 2026-11-05
-    scenarios:
-      - kind: required
-        name: late cancel fee
-        given: driver assigned and grace period has passed
-        when: rider confirms the cancel
-        then: flat fee is charged and credited to the driver
-      - kind: forbidden
-        name: hidden fee
-        given: a fee will apply
-        when: rider taps cancel
-        then: cancel completes without first showing the fee
-    check:
-      method: test
-      ref: tests/test_cancel_fee.py
-      strength: bounded
-
-  - id: PAY-1
-    statement: WHEN a rider requests a ride, THE SYSTEM SHALL verify the payment method and hold the estimated fare, and WHEN the trip ends, THE SYSTEM SHALL charge the final fare.
-    status: confirmed
-    revision: 2
-    required: true
-    rationale: Modelled on Uber's typical flow (pre-authorize at request, charge at end of trip). Not decided whether a hold or only a card check is used.
-    source:
-      kind: stakeholder
-      ref: "app owner, chat 2026-11-05 (confirmed as proposed; values configurable)"
-    decided_by: app owner (chandrafirst67)
-    decided_on: 2026-11-05
-    scenarios:
-      - kind: required
-        name: charge at trip end
-        given: trip completed with a valid payment method
-        when: trip ends
-        then: final fare is charged once
-      - kind: forbidden
-        name: double charge
-        given: trip completed and already charged
-        when: charge is retried
-        then: rider is charged a second time
-    check:
-      method: test
-      ref: tests/test_charge_once.py
-      strength: sampled
-
-  - id: PAY-2
-    statement: WHEN a rider's payment fails, THE SYSTEM SHALL record an outstanding balance on the rider and block new ride requests until it is paid, and THE SYSTEM SHALL still pay the driver in full.
-    status: confirmed
-    revision: 2
-    required: true
-    rationale: Platform bears the loss; matches Uber, Grab and Gojek. Decided 2026-11-05.
-    source:
-      kind: stakeholder
-      ref: "app owner, chat 2026-11-05"
-    decided_by: app owner (chandrafirst67)
-    decided_on: 2026-11-05
-    scenarios:
-      - kind: required
-        name: block after failed payment
-        given: rider has an unpaid balance
-        when: rider requests a ride
-        then: request is rejected with a prompt to pay
-      - kind: forbidden
-        name: driver unpaid
-        given: rider payment failed
-        when: trip is settled
-        then: driver receives nothing
-    check:
-      method: test
-      ref: tests/test_failed_payment.py
-      strength: sampled
-
-  - id: CANCEL-3
-    statement: WHEN the driver has arrived and the rider has not shown up within 5 minutes, THE SYSTEM SHALL let the driver cancel and charge the rider the same flat fee as CANCEL-2 ($5), credited to the driver. The waiting time and fee SHALL be configuration values.
-    status: confirmed
-    revision: 2
-    required: true
-    rationale: Same fee as CANCEL-2. Decided 2026-11-05.
-    source:
-      kind: stakeholder
-      ref: "app owner, chat 2026-11-05"
-    decided_by: app owner (chandrafirst67)
-    decided_on: 2026-11-05
-    scenarios:
-      - kind: required
-        name: no-show fee
-        given: driver arrived and waiting time has passed
-        when: driver cancels as no-show
-        then: rider is charged the fee, credited to the driver
-      - kind: forbidden
-        name: early no-show
-        given: driver arrived and waiting time has not passed
-        when: driver cancels as no-show
-        then: rider is charged
-    check:
-      method: test
-      ref: tests/test_no_show_fee.py
-      strength: bounded
-
-  - id: SAFE-1
-    statement: THE SYSTEM SHALL NOT offer rides to a driver unless the driver has a valid driver license, valid vehicle documents (registration, insurance, inspection), a passed background check, and an ID and photo match (re-checked by selfie on login).
-    status: confirmed
-    revision: 3
-    required: true
-    rationale: Rider safety. Decided 2026-11-05.
-    source:
-      kind: stakeholder
-      ref: "app owner, chat 2026-11-05"
-    decided_by: app owner (chandrafirst67)
-    decided_on: 2026-11-05
-    scenarios:
-      - kind: required
-        name: verified driver activated
-        given: driver has a valid license, vehicle documents, a passed background check and a matching ID/photo
-        when: driver goes online
-        then: driver can receive ride offers
-      - kind: required
-        name: selfie match on login
-        given: an activated driver logs in
-        when: the selfie does not match the ID photo
-        then: driver cannot go online
-      - kind: forbidden
-        name: unverified driver gets rides
-        given: any of license, vehicle documents, background check or ID/photo match is missing, failed or expired
-        when: driver goes online
-        then: driver receives a ride offer
-    check:
-      method: test
-      ref: tests/test_driver_gating.py
-      strength: sampled
-
-  - id: FARE-1
-    statement: THE SYSTEM SHALL charge the rider exactly the upfront fare shown before the request was confirmed (REQ-1), except in these cases only. (a) WHEN the rider changes the destination or adds a stop in the app, THE SYSTEM SHALL show a new price and apply it only after the rider confirms it. (b) Actual tolls not in the estimate are added. (c) The pickup waiting fee (CANCEL-3 wait time) is added. (d) WHEN the route or duration differs significantly from the estimate beyond the detour threshold (by default 30% over the estimated time or distance), or the rider changes the route without updating the app, THE SYSTEM SHALL charge by actual time and distance. The threshold SHALL be a configuration value, default 30%.
-    status: confirmed
-    revision: 3
-    required: true
-    rationale: Owner chose an upfront fixed price with Uber's exceptions on 2026-11-05. Detour threshold is configurable and still to be set.
-    source:
-      kind: stakeholder
-      ref: "app owner, chat 2026-11-05 (as Uber, required yes)"
-    decided_by: app owner (chandrafirst67)
-    decided_on: 2026-11-05
-    depends_on: [REQ-1, PAY-1]
-    scenarios:
-      - kind: required
-        name: charged the estimate
-        given: rider confirmed an upfront fare and nothing changed
-        when: trip ends
-        then: rider is charged exactly the upfront fare
-      - kind: required
-        name: confirmed destination change
-        given: rider changes destination mid-trip
-        when: rider confirms the new price
-        then: rider is charged the new price
-      - kind: forbidden
-        name: unconfirmed price change
-        given: rider changes destination or adds a stop
-        when: rider has not confirmed the new price
-        then: the new price is charged
-      - kind: forbidden
-        name: surprise overcharge
-        given: no change by the rider and the trip is within the detour threshold
-        when: trip takes longer than estimated
-        then: rider is charged more than the upfront fare
-    check:
-      method: test
-      ref: tests/test_upfront_fare.py
-      strength: sampled
-
-  - id: DCANCEL-1
-    statement: WHEN a driver cancels after accepting a ride, THE SYSTEM SHALL charge the rider no fee and SHALL automatically re-dispatch the request to the next available driver (MATCH-1 still applies), and SHALL tell the rider.
-    status: confirmed
-    revision: 2
-    required: true
-    rationale: Owner asked for Uber's behavior on 2026-11-05. Uber re-dispatches without a fee when the driver cancels. If the driver cancelled after waiting at pickup past the wait time, that is a no-show and CANCEL-3 applies instead.
-    source:
-      kind: stakeholder
-      ref: "app owner, chat 2026-11-05 (as Uber)"
-    decided_by: app owner (chandrafirst67)
-    decided_on: 2026-11-05
-    depends_on: [MATCH-1, CANCEL-3]
-    scenarios:
-      - kind: required
-        name: driver cancels early
-        given: driver accepted and has not waited the full wait time at pickup
-        when: driver cancels
-        then: rider is not charged and the request is offered to the next driver
-      - kind: forbidden
-        name: rider fee for driver cancel
-        given: driver cancelled before the no-show wait time
-        when: the ride is closed
-        then: rider is charged any fee
-    check:
-      method: test
-      ref: tests/test_driver_cancel.py
-      strength: sampled
-
-  - id: DCANCEL-2
-    statement: THE SYSTEM SHALL track each driver's cancellation rate (cancelled accepted rides out of accepted rides) and SHALL warn the driver, then deactivate the driver, WHEN the weekly rate is 10% or more (warning) and stays at 25% or more (deactivation review). Both limits SHALL be configuration values, defaults 10% and 25%, settable per city.
-    status: confirmed
-    revision: 3
-    required: false
-    rationale: Uber's deactivation policy limits cancellation rate per city. Maximum, review window and warning steps are not decided. Whether the rate counts accepted or assigned trips is unsettled in sources.
-    source:
-      kind: stakeholder
-      ref: "app owner, chat 2026-11-05 (as Uber)"
-    decided_by: app owner (chandrafirst67)
-    decided_on: 2026-11-05
-    scenarios:
-      - kind: required
-        name: rate above limit
-        given: driver cancellation rate stays above the city maximum
-        when: the review runs
-        then: driver is warned, then deactivated if it continues
-      - kind: forbidden
-        name: no-show cancels counted
-        given: a driver cancels because the rider did not show up within the wait time
-        when: the rate is computed
-        then: that cancel counts against the driver
-    check:
-      method: test
-      ref: tests/test_driver_cancel_rate.py
-      strength: sampled
-
-  - id: SURGE-1
-    statement: WHEN demand raises prices, THE SYSTEM SHALL include the increase in the upfront fare shown before confirming, with a notice that fares are higher due to demand, and SHALL NOT raise the fare after the rider confirms it (FARE-1 exceptions aside). The surge SHALL NOT exceed 2x the normal fare. The cap SHALL be a configuration value, default 2x.
-    status: confirmed
-    revision: 3
-    required: true
-    rationale: Uber folds surge into one upfront price instead of showing a multiplier. A surge cap and an emergency cap are not decided.
-    source:
-      kind: stakeholder
-      ref: "app owner, chat 2026-11-05 (as Uber)"
-    decided_by: app owner (chandrafirst67)
-    decided_on: 2026-11-05
-    depends_on: [FARE-1, REQ-1]
-    scenarios:
-      - kind: required
-        name: surge shown upfront
-        given: demand is high
-        when: rider opens the request screen
-        then: the higher total and a demand notice are shown before confirming
-      - kind: forbidden
-        name: surge added after confirming
-        given: rider confirmed an upfront fare
-        when: demand rises before the trip ends
-        then: the fare increases
-    check:
-      method: test
-      ref: tests/test_surge_fare.py
-      strength: sampled
-
-  - id: REFUND-1
-    statement: WHEN a rider reports a fare charged in error, a trip that ended well short of the requested destination, or a trip the driver did not end in the app, THE SYSTEM SHALL review the report and refund the difference or the whole fare when it is upheld. Reports SHALL be accepted within 30 days of the trip. The window (default 30 days) and what counts as short of the destination SHALL be configuration values.
-    status: confirmed
-    revision: 3
-    required: true
-    rationale: Uber's refund policy lists these cases (page last modified 2020, may be outdated). A 30-day window appears only in third-party sources and is unverified.
-    source:
-      kind: stakeholder
-      ref: "app owner, chat 2026-11-05 (as Uber)"
-    decided_by: app owner (chandrafirst67)
-    decided_on: 2026-11-05
-    scenarios:
-      - kind: required
-        name: upheld report refunded
-        given: rider reports an overcharge inside the window and it is upheld
-        when: the review finishes
-        then: rider is refunded the difference
-      - kind: forbidden
-        name: report after window ignored silently
-        given: rider reports after the window
-        when: the report is submitted
-        then: it is dropped with no reply
-    check:
-      method: test
-      ref: tests/test_refund_report.py
-      strength: sampled
-
-  - id: TRIP-1
-    statement: WHEN a trip ends before the requested destination, or the driver goes offline mid-trip, THE SYSTEM SHALL charge only for the part completed, tell the rider, and keep the rider's safety information available. WHEN the driver fails to end a finished trip, THE SYSTEM SHALL end it automatically and SHALL NOT charge above the upfront fare because of it.
-    status: confirmed
-    revision: 2
-    required: true
-    rationale: Uber says drivers must end trips in the app, and riders have been overcharged when they do not. Partial-trip pricing and rider-safety handling (support contact, re-dispatch to finish the trip) are not decided.
-    source:
-      kind: stakeholder
-      ref: "app owner, chat 2026-11-05 (as Uber)"
-    decided_by: app owner (chandrafirst67)
-    decided_on: 2026-11-05
-    depends_on: [FARE-1]
-    scenarios:
-      - kind: required
-        name: partial trip charged partially
-        given: trip ended short of the destination
-        when: trip is closed
-        then: rider is charged only for the part completed
-      - kind: forbidden
-        name: overcharge from unended trip
-        given: driver reached the destination but did not end the trip
-        when: the fare is computed
-        then: rider is charged more than the upfront fare
-    check:
-      method: test
-      ref: tests/test_trip_end.py
-      strength: sampled
-
-  - id: RATE-1
-    statement: WHEN a trip ends, THE SYSTEM SHALL let the rider and the driver each rate the other, and SHALL show a person only their own average. WHEN a rider's or driver's average is below 4.5 (warning) and stays below 4.2 (deactivation review) on a 5-star scale, THE SYSTEM SHALL first notify them with tips to improve, and only then deactivate the account. Both thresholds SHALL be configuration values, defaults 4.5 and 4.2, settable per city. The rating window SHALL also be a configuration value.
-    status: confirmed
-    revision: 3
-    required: false
-    rationale: Uber rates both sides and deactivates low-rated riders and drivers after warnings, with thresholds set per city. Uber does not publish the numbers (4.6 for drivers is from leaked documents, unconfirmed). Rating window not found.
-    source:
-      kind: stakeholder
-      ref: "app owner, chat 2026-11-05 (as Uber)"
-    decided_by: app owner (chandrafirst67)
-    decided_on: 2026-11-05
-    scenarios:
-      - kind: required
-        name: warned before deactivation
-        given: average is below the city threshold
-        when: the review runs
-        then: the person is notified in the app and given a chance to improve
-      - kind: forbidden
-        name: deactivated with no warning
-        given: average is below the city threshold and no warning was sent
-        when: the review runs
-        then: the account is deactivated
-    check:
-      method: test
-      ref: tests/test_rating_warning.py
-      strength: sampled
-
-  - id: SAFE-2
-    statement: DURING a trip, THE SYSTEM SHALL let the rider share live trip status with trusted contacts, shall give the rider an in-app way to call local emergency services, and SHALL check on the rider when the trip stops unexpectedly for more than 5 minutes or goes more than 1 km off-route (both configuration values).
-    status: confirmed
-    revision: 3
-    required: true
-    rationale: Uber offers Share My Trip, an emergency button and RideCheck, which varies by country. Long-stop time, off-route distance and who gets alerted are not decided.
-    source:
-      kind: stakeholder
-      ref: "app owner, chat 2026-11-05 (as Uber)"
-    decided_by: app owner (chandrafirst67)
-    decided_on: 2026-11-05
-    scenarios:
-      - kind: required
-        name: share live trip
-        given: a trip in progress and a trusted contact
-        when: rider shares the trip
-        then: the contact can follow it live from a link
-      - kind: required
-        name: long unexpected stop
-        given: the trip stopped for longer than the configured time
-        when: the check triggers
-        then: the rider is asked if they are okay and offered help
-      - kind: forbidden
-        name: no help route
-        given: a trip in progress
-        when: rider looks for emergency help
-        then: no in-app way to reach emergency services exists
-    check:
-      method: test
-      ref: tests/test_trip_safety.py
-      strength: sampled
-
-  - id: SAFE-3
-    statement: THE SYSTEM SHALL use a background-check provider and document-verification process that a named person has reviewed and judged adequate, and SHALL repeat that review every 6 months (configurable).
-    status: confirmed
-    revision: 1
-    required: true
-    rationale: Split from SAFE-1 on 2026-11-05. Whether the provider and process are adequate is a human judgment, so its check is a written review. Review every 6 months. The reviewer is still to be named.
-    source:
-      kind: stakeholder
-      ref: "app owner, chat 2026-11-05"
-    decided_by: app owner (chandrafirst67)
-    decided_on: 2026-11-05
-    depends_on: [SAFE-1]
-    scenarios:
-      - kind: required
-        name: provider reviewed
-        given: a background-check provider and verification process are in use
-        when: the scheduled review comes due
-        then: a named reviewer records a judgment of adequate or not adequate
-      - kind: forbidden
-        name: unreviewed provider
-        given: the review is overdue
-        when: new drivers are activated
-        then: they are activated with no review on record
-    check:
-      method: review
-      ref: reviews/driver_verification.md
-      strength: human
-
-  - id: PRIV-1
-    statement: THE SYSTEM SHALL route calls and messages between rider and driver through the app so neither sees the other's real phone number, and SHALL show a driver only a broader area, not exact pickup and drop-off addresses, in the driver's trip history after the trip.
-    status: confirmed
-    revision: 1
-    required: true
-    rationale: Owner chose "as Uber" on 2026-11-05. Uber masks phone numbers and obscures addresses in driver history. How long exact addresses are kept for safety and disputes is not decided.
-    source:
-      kind: stakeholder
-      ref: "app owner, chat 2026-11-05 (as Uber)"
-    decided_by: app owner (chandrafirst67)
-    decided_on: 2026-11-05
-    scenarios:
-      - kind: required
-        name: masked call
-        given: a rider and a driver on an active trip
-        when: either calls or messages the other in the app
-        then: the other side sees an app-provided number, not the real one
-      - kind: forbidden
-        name: exact address in history
-        given: a completed trip
-        when: the driver opens their trip history
-        then: the exact pickup or drop-off address is shown
-    check:
-      method: test
-      ref: tests/test_privacy_masking.py
-      strength: sampled
-
-  - id: MATCH-2
-    statement: WHEN a driver is offered a ride, THE SYSTEM SHALL give the driver 15 seconds to accept, and WHEN the driver declines or the time runs out, THE SYSTEM SHALL offer the ride to the next driver (MATCH-1 still applies). The accept time SHALL be a configuration value, default 15 seconds.
-    status: confirmed
-    revision: 1
-    required: true
-    rationale: Uber publishes no figure; third-party sources say about 10 to 15 seconds. Owner chose 15 seconds on 2026-11-05.
-    source:
-      kind: stakeholder
-      ref: "app owner, chat 2026-11-05"
-    decided_by: app owner (chandrafirst67)
-    decided_on: 2026-11-05
-    depends_on: [MATCH-1]
-    scenarios:
-      - kind: required
-        name: timeout passes the offer
-        given: a driver has an open offer
-        when: 15 seconds pass with no response
-        then: the offer closes for that driver and goes to the next one
-      - kind: forbidden
-        name: accept after timeout
-        given: the offer has timed out and gone to another driver
-        when: the first driver taps accept
-        then: the first driver is assigned the ride
-    check:
-      method: test
-      ref: tests/test_offer_timer.py
-      strength: bounded
-
-  - id: MATCH-3
-    statement: WHEN a driver declines or ignores several offers in a row, THE SYSTEM SHALL take the driver offline for a short timeout. The number of offers and the timeout length SHALL be configuration values, defaults 3 offers and 5 minutes. A timeout SHALL NOT start for offers that closed because another driver was assigned.
-    status: confirmed
-    revision: 1
-    required: true
-    rationale: Uber can time out drivers who ignore requests (reports say 2 to 30 minutes by city) and the practice is criticised. Owner chose "short timeout" on 2026-11-05. The defaults 3 offers and 5 minutes are my assumptions, not Uber figures.
-    source:
-      kind: stakeholder
-      ref: "app owner, chat 2026-11-05 (short timeout)"
-    decided_by: app owner (chandrafirst67)
-    decided_on: 2026-11-05
-    depends_on: [MATCH-2]
-    scenarios:
-      - kind: required
-        name: repeated ignores
-        given: a driver ignores 3 offers in a row
-        when: the third offer times out
-        then: the driver is taken offline for the timeout
-      - kind: forbidden
-        name: timeout for a lost offer
-        given: an offer closed because another driver was assigned
-        when: the driver's streak is counted
-        then: that offer counts as ignored
-    check:
-      method: test
-      ref: tests/test_ignored_offers.py
-      strength: bounded
-
-  - id: EARN-1
-    statement: THE SYSTEM SHALL keep 20% of each completed trip's fare as commission and pay the remainder to the driver weekly, and SHALL offer an optional instant cash-out for a fee. The commission rate, payout day and instant cash-out fee SHALL be configuration values, settable per market. The commission SHALL NOT exceed any legal maximum for the market.
-    status: confirmed
-    revision: 1
-    required: true
-    rationale: Owner chose 20% and weekly payout on 2026-11-05. Third-party sources put Uber's cut at roughly 25 to 30%, and Indonesia recently ordered a maximum commission of 8%, so the legal cap is a real constraint. Payout day and instant cash-out fee are not decided. PAY-2 already requires the driver be paid if the rider's payment fails.
-    source:
-      kind: stakeholder
-      ref: "app owner, chat 2026-11-05"
-    decided_by: app owner (chandrafirst67)
-    decided_on: 2026-11-05
-    depends_on: [PAY-2]
-    scenarios:
-      - kind: required
-        name: weekly payout
-        given: a driver completed trips during the week
-        when: the weekly payout runs
-        then: the driver receives fares minus 20% commission
-      - kind: forbidden
-        name: commission above legal cap
-        given: a market has a legal maximum commission
-        when: a trip is settled
-        then: commission above the maximum is taken
-    check:
-      method: test
-      ref: tests/test_commission_payout.py
-      strength: sampled
-
-  - id: PAYM-1
-    statement: THE SYSTEM SHALL accept credit and debit cards, mobile wallets (Apple Pay, Google Pay) and cash, and WHEN a rider's card is expired or declined, THE SYSTEM SHALL ask for another method before a ride can be requested. WHEN a rider pays cash, THE SYSTEM SHALL record the fare as paid to the driver and the commission as owed by the driver to the platform.
-    status: proposed
-    revision: 1
-    rationale: Owner chose cards, wallets and cash on 2026-11-05. Uber accepts cards and wallets, varying by location, and I found nothing on expired cards or cash. Cash conflicts with PAY-1 (hold at request) and PAY-2 (unpaid balance on the rider), which assume a digital payment. How cash commission is collected and what happens to an unpaid cash fare are not decided.
-    source:
-      kind: stakeholder
-      ref: "app owner, chat 2026-11-05"
-    depends_on: [PAY-1, PAY-2, EARN-1]
-    scenarios:
-      - kind: required
-        name: expired card
-        given: the rider's only method is an expired card
-        when: rider requests a ride
-        then: the request is blocked and the rider is asked for another method
-      - kind: required
-        name: cash trip
-        given: a trip paid in cash
-        when: the trip ends
-        then: the commission is recorded as owed by the driver
-      - kind: forbidden
-        name: hold on a cash trip
-        given: the rider chose cash
-        when: the rider requests a ride
-        then: a card hold is placed
-
-  - id: PROMO-1
-    statement: WHEN a rider enters a promo code before the trip, THE SYSTEM SHALL apply it to the base fare and fees but not to tips, SHALL honour any city limit on the code, and SHALL grant referral credit to a rider who invites a friend who completes a first trip. Credit amounts and whether codes combine SHALL be configuration values.
-    status: proposed
-    revision: 1
-    rationale: Owner chose "as Uber" on 2026-11-05. Uber codes are entered before the trip, do not reduce tips, and can be limited by city. Referral rules, stacking, expiry, and whether the platform or the driver bears the discount are not decided. A discount must not reduce the driver's pay unless decided (see EARN-1).
-    source:
-      kind: stakeholder
-      ref: "app owner, chat 2026-11-05 (as Uber)"
-    depends_on: [FARE-1, EARN-1]
-    scenarios:
-      - kind: required
-        name: promo applied
-        given: a valid code entered before the trip
-        when: the trip ends
-        then: the discount applies to fare and fees and not to the tip
-      - kind: forbidden
-        name: code outside its city
-        given: a code limited to another city
-        when: rider enters it
-        then: the discount is applied
-
-  - id: ACCESS-1
-    statement: THE SYSTEM SHALL let a rider flag that they travel with a service or assistance animal, SHALL treat a driver's refusal of such a rider as a violation that can end the driver's access, SHALL send the rider an in-app message when a driver cancels such a trip, and SHALL offer a wheelchair-accessible vehicle option.
-    status: proposed
-    revision: 1
-    rationale: Owner chose "as Uber" on 2026-11-05. Uber treats refusal as illegal and against policy, but news reports show drivers still cancel on riders with service dogs. How a refusal is detected, the penalty ladder, and where a wheelchair-accessible vehicle is available are not decided.
-    source:
-      kind: stakeholder
-      ref: "app owner, chat 2026-11-05 (as Uber)"
-    scenarios:
-      - kind: required
-        name: flagged animal cancel
-        given: a rider flagged an assistance animal
-        when: the driver cancels
-        then: the rider gets an in-app message and the cancel is reviewed
-      - kind: forbidden
-        name: no fee after refusal
-        given: a driver refused a rider with a service animal
-        when: the trip closes
-        then: the rider is charged any cancellation fee
+- id: REQ-1
+  statement: WHEN a rider requests a ride, THE SYSTEM SHALL show the fare estimate before the request is confirmed.
+  status: confirmed
+  revision: 2
+  required: true
+  rationale: Standard practice; avoids surprise charges.
+  source:
+    kind: stakeholder
+    ref: app owner, chat review 2026-11-04
+  decided_by: app owner (chandrafirst67)
+  decided_on: 2026-11-05
+  scenarios:
+  - kind: required
+    name: estimate shown
+    given: rider picked pickup and destination
+    when: rider opens the request screen
+    then: estimated fare is shown before they can confirm
+  - kind: forbidden
+    name: confirm without estimate
+    given: fare estimate unavailable
+    when: rider tries to confirm
+    then: request is blocked, not sent with an unknown fare
+  check:
+    method: test
+    ref: tests/test_estimate.py
+    strength: sampled
+- id: REQ-2
+  statement: WHEN a rider already has an active ride, THE SYSTEM SHALL reject a second ride request from that rider.
+  status: confirmed
+  revision: 2
+  required: true
+  rationale: Prevents duplicate or overlapping trips; may be too strict (e.g. booking for a friend).
+  source:
+    kind: stakeholder
+    ref: app owner, chat review 2026-11-04
+  decided_by: app owner (chandrafirst67)
+  decided_on: 2026-11-05
+  scenarios:
+  - kind: required
+    name: first request accepted
+    given: rider has no active ride
+    when: rider requests a ride
+    then: request is created
+  - kind: forbidden
+    name: duplicate request
+    given: rider has an active ride
+    when: rider requests another
+    then: rejected, existing ride unchanged
+  check:
+    method: test
+    ref: tests/test_active_ride.py
+    strength: sampled
+- id: MATCH-1
+  statement: THE SYSTEM SHALL NOT offer one ride request to more than one driver at the same time.
+  status: confirmed
+  revision: 3
+  required: true
+  rationale: Avoids two drivers accepting the same ride. Uber-style sequential dispatch.
+  source:
+    kind: stakeholder
+    ref: app owner, chat review 2026-11-04
+  decided_by: app owner (chandrafirst67)
+  decided_on: 2026-11-05
+  scenarios:
+  - kind: required
+    name: sequential offers
+    given: three nearby drivers
+    when: first driver declines or times out
+    then: offer goes to the next driver
+  - kind: forbidden
+    name: double accept
+    given: two drivers see the same request
+    when: both accept
+    then: only one is assigned
+  check:
+    method: assertion
+    ref: dispatch assertion - at most one open offer per ride request (planned)
+    strength: sampled
+- id: CANCEL-1
+  statement: WHEN a rider cancels before a driver is assigned, or within the free-cancel window (cancel_grace_minutes, default 5) after a driver is assigned, THE SYSTEM SHALL charge no cancellation fee. The window SHALL come from the market config for the rider's market (ridehailing.markets.yaml), not be hard-coded.
+  status: confirmed
+  revision: 3
+  required: true
+  rationale: Switched from Uber (2 minutes) to Grab (5 minutes, Grab Philippines) on 2026-11-05, with the value per market.
+  source:
+    kind: stakeholder
+    ref: app owner, chat 2026-11-05 (grace period 2 minutes, configurable)
+  decided_by: app owner (chandrafirst67)
+  decided_on: &id001 2026-11-05
+  scenarios:
+  - kind: required
+    name: free cancel before acceptance
+    given: no driver has accepted the request
+    when: rider cancels
+    then: request is cancelled and no fee is charged
+  - kind: required
+    name: free cancel inside grace period
+    given: a driver accepted less than the grace period ago
+    when: rider cancels
+    then: no fee is charged
+  - kind: forbidden
+    name: fee inside free window
+    given: no driver assigned, or still inside the grace period
+    when: rider cancels
+    then: any fee is charged
+  check:
+    method: test
+    ref: tests/test_cancel_grace.py
+    strength: bounded
+- id: CANCEL-2
+  statement: WHEN a rider cancels after the free-cancel window once a driver is assigned, THE SYSTEM SHALL charge the market's flat cancellation fee (cancel_fee_amount, in the market currency), show it before the rider confirms the cancel, and credit 100% of it to the driver with no commission taken. The amount SHALL come from the market config for the rider's market (ridehailing.markets.yaml).
+  status: confirmed
+  revision: 3
+  required: true
+  rationale: 'Switched from a flat $5 to a per-market flat fee on 2026-11-05 (Grab PH: P50, 100% to the driver). Fee amounts for MY and SG are unverified; TH, VN and ID are unset.'
+  source:
+    kind: stakeholder
+    ref: app owner, chat 2026-11-05 (flat $5, configurable)
+  decided_by: app owner (chandrafirst67)
+  decided_on: *id001
+  scenarios:
+  - kind: required
+    name: late cancel fee
+    given: driver assigned and grace period has passed
+    when: rider confirms the cancel
+    then: flat fee is charged and credited to the driver
+  - kind: forbidden
+    name: hidden fee
+    given: a fee will apply
+    when: rider taps cancel
+    then: cancel completes without first showing the fee
+  check:
+    method: test
+    ref: tests/test_cancel_fee.py
+    strength: bounded
+- id: PAY-1
+  statement: WHEN a rider requests a ride paid by card or wallet, THE SYSTEM SHALL verify the payment method and hold the maximum possible fare, and WHEN the trip ends, THE SYSTEM SHALL charge the final fare once and release any unused part of the hold. A cash trip SHALL NOT place a hold (PAYM-1).
+  status: confirmed
+  revision: 3
+  required: true
+  rationale: Grab holds an upper-bound amount and releases the excess. Cash trips are handled by PAYM-1.
+  source:
+    kind: stakeholder
+    ref: app owner, chat 2026-11-05 (confirmed as proposed; values configurable)
+  decided_by: app owner (chandrafirst67)
+  decided_on: *id001
+  scenarios:
+  - kind: required
+    name: charge at trip end
+    given: trip completed with a valid payment method
+    when: trip ends
+    then: final fare is charged once
+  - kind: forbidden
+    name: double charge
+    given: trip completed and already charged
+    when: charge is retried
+    then: rider is charged a second time
+  check:
+    method: test
+    ref: tests/test_charge_once.py
+    strength: sampled
+- id: PAY-2
+  statement: WHEN a card or wallet payment fails, THE SYSTEM SHALL record an outstanding balance on the rider and block new ride requests until it is paid, and THE SYSTEM SHALL still pay the driver the fare minus commission (EARN-1). An unpaid cash fare is handled by PAYM-1.
+  status: confirmed
+  revision: 3
+  required: true
+  rationale: 'Clarified on 2026-11-05: ''paid in full'' means fare minus commission. Grab''s own policy on unpaid balances was not found.'
+  source:
+    kind: stakeholder
+    ref: app owner, chat 2026-11-05
+  decided_by: app owner (chandrafirst67)
+  decided_on: *id001
+  scenarios:
+  - kind: required
+    name: block after failed payment
+    given: rider has an unpaid balance
+    when: rider requests a ride
+    then: request is rejected with a prompt to pay
+  - kind: forbidden
+    name: driver unpaid
+    given: rider payment failed
+    when: trip is settled
+    then: driver receives nothing
+  check:
+    method: test
+    ref: tests/test_failed_payment.py
+    strength: sampled
+- id: CANCEL-3
+  statement: WHEN the driver has arrived and the rider has not shown up within the market's wait time (noshow_wait_minutes, default 5), THE SYSTEM SHALL let the driver cancel as a no-show and charge the rider the same fee as CANCEL-2, credited 100% to the driver with no commission taken. Wait time and fee SHALL come from the market config for the rider's market (ridehailing.markets.yaml).
+  status: confirmed
+  revision: 3
+  required: true
+  rationale: Grab charges the same fee for no-shows. There is no separate waiting fee (removed from FARE-1 on 2026-11-05).
+  source:
+    kind: stakeholder
+    ref: app owner, chat 2026-11-05
+  decided_by: app owner (chandrafirst67)
+  decided_on: *id001
+  scenarios:
+  - kind: required
+    name: no-show fee
+    given: driver arrived and waiting time has passed
+    when: driver cancels as no-show
+    then: rider is charged the fee, credited to the driver
+  - kind: forbidden
+    name: early no-show
+    given: driver arrived and waiting time has not passed
+    when: driver cancels as no-show
+    then: rider is charged
+  check:
+    method: test
+    ref: tests/test_no_show_fee.py
+    strength: bounded
+- id: SAFE-1
+  statement: THE SYSTEM SHALL NOT offer rides to a driver unless the driver has a valid driver license, valid vehicle documents (registration, insurance, inspection), a passed background check, and an ID and photo match, re-checked by selfie on login and at random times while the driver is online.
+  status: confirmed
+  revision: 4
+  required: true
+  rationale: Random selfie checks during the day added on 2026-11-05 (Grab Philippines, September 2024). No Grab background-check detail was found.
+  source:
+    kind: stakeholder
+    ref: app owner, chat 2026-11-05
+  decided_by: app owner (chandrafirst67)
+  decided_on: *id001
+  scenarios:
+  - kind: required
+    name: verified driver activated
+    given: driver has a valid license, vehicle documents, a passed background check and a matching ID/photo
+    when: driver goes online
+    then: driver can receive ride offers
+  - kind: required
+    name: selfie match on login
+    given: an activated driver logs in
+    when: the selfie does not match the ID photo
+    then: driver cannot go online
+  - kind: forbidden
+    name: unverified driver gets rides
+    given: any of license, vehicle documents, background check or ID/photo match is missing, failed or expired
+    when: driver goes online
+    then: driver receives a ride offer
+  - kind: forbidden
+    name: failed random selfie
+    given: a driver is online
+    when: a random selfie does not match the ID photo
+    then: the driver keeps receiving ride offers
+  check:
+    method: test
+    ref: tests/test_driver_gating.py
+    strength: sampled
+- id: FARE-1
+  statement: THE SYSTEM SHALL charge the rider exactly the upfront fare shown before the request was confirmed (REQ-1), which may include surge (SURGE-1), except in these cases only. (a) WHEN the rider changes the destination or adds a stop in the app, where the market allows it and at most destination_changes_per_trip times (default once), THE SYSTEM SHALL show a new price including any surcharge and apply it only after the rider confirms it. (b) Actual tolls not in the estimate are added. (c) WHEN a trip ends before the requested destination or the driver goes offline, TRIP-1 applies and only the part completed is charged. (d) A promo discount (PROMO-1) lowers the amount the rider pays. (e) WHEN the rider changes the route without updating the app, or the route or duration differs beyond the detour threshold (detour_threshold_percent, default 30% over the estimated time or distance) because of the rider's changes, THE SYSTEM SHALL charge by actual time and distance. A detour caused by the driver SHALL NOT raise the fare. Thresholds SHALL come from the market config for the rider's market (ridehailing.markets.yaml).
+  status: confirmed
+  revision: 4
+  required: true
+  rationale: 'Rewritten on 2026-11-05: waiting fee removed (Grab charges a no-show fee instead), TRIP-1 and promo exceptions added, driver-caused detours cannot raise the fare, destination change limited to once per trip (Grab PH).'
+  source:
+    kind: stakeholder
+    ref: app owner, chat 2026-11-05 (as Uber, required yes)
+  decided_by: app owner (chandrafirst67)
+  decided_on: *id001
+  depends_on:
+  - REQ-1
+  - PAY-1
+  scenarios:
+  - kind: required
+    name: charged the estimate
+    given: rider confirmed an upfront fare and nothing changed
+    when: trip ends
+    then: rider is charged exactly the upfront fare
+  - kind: required
+    name: confirmed destination change
+    given: rider changes destination mid-trip
+    when: rider confirms the new price
+    then: rider is charged the new price
+  - kind: forbidden
+    name: unconfirmed price change
+    given: rider changes destination or adds a stop
+    when: rider has not confirmed the new price
+    then: the new price is charged
+  - kind: forbidden
+    name: surprise overcharge
+    given: no change by the rider and the trip is within the detour threshold
+    when: trip takes longer than estimated
+    then: rider is charged more than the upfront fare
+  - kind: required
+    name: limited destination changes
+    given: the rider already changed the destination once
+    when: the rider tries to change it again
+    then: the change is refused in markets limiting changes to once per trip
+  - kind: forbidden
+    name: driver detour overcharge
+    given: the driver took a longer route the rider did not change
+    when: the trip ends
+    then: the rider is charged more than the upfront fare
+  check:
+    method: test
+    ref: tests/test_upfront_fare.py
+    strength: sampled
+- id: DCANCEL-1
+  statement: WHEN a driver cancels after accepting a ride, THE SYSTEM SHALL charge the rider no fee, SHALL automatically re-dispatch the request to the next available driver (MATCH-1 still applies), and SHALL tell the rider. The one exception is a no-show cancel under CANCEL-3, where the rider's fee applies and there is no re-dispatch.
+  status: confirmed
+  revision: 3
+  required: true
+  rationale: Exception for CANCEL-3 added on 2026-11-05 to remove the contradiction between the two rules.
+  source:
+    kind: stakeholder
+    ref: app owner, chat 2026-11-05 (as Uber)
+  decided_by: app owner (chandrafirst67)
+  decided_on: *id001
+  depends_on:
+  - MATCH-1
+  - CANCEL-3
+  scenarios:
+  - kind: required
+    name: driver cancels early
+    given: driver accepted and has not waited the full wait time at pickup
+    when: driver cancels
+    then: rider is not charged and the request is offered to the next driver
+  - kind: forbidden
+    name: rider fee for driver cancel
+    given: driver cancelled before the no-show wait time
+    when: the ride is closed
+    then: rider is charged any fee
+  check:
+    method: test
+    ref: tests/test_driver_cancel.py
+    strength: sampled
+- id: DCANCEL-2
+  statement: THE SYSTEM SHALL track each driver's cancellation rate (cancelled accepted rides out of accepted rides) and SHALL warn the driver, then deactivate the driver, WHEN the weekly rate is 10% or more (warning) and stays at 25% or more (deactivation review). Both limits SHALL be configuration values, defaults 10% and 25%, settable per city.
+  status: confirmed
+  revision: 3
+  required: false
+  rationale: Uber's deactivation policy limits cancellation rate per city. Maximum, review window and warning steps are not decided. Whether the rate counts accepted or assigned trips is unsettled in sources.
+  source:
+    kind: stakeholder
+    ref: app owner, chat 2026-11-05 (as Uber)
+  decided_by: app owner (chandrafirst67)
+  decided_on: 2026-11-05
+  scenarios:
+  - kind: required
+    name: rate above limit
+    given: driver cancellation rate stays above the city maximum
+    when: the review runs
+    then: driver is warned, then deactivated if it continues
+  - kind: forbidden
+    name: no-show cancels counted
+    given: a driver cancels because the rider did not show up within the wait time
+    when: the rate is computed
+    then: that cancel counts against the driver
+  check:
+    method: test
+    ref: tests/test_driver_cancel_rate.py
+    strength: sampled
+- id: SURGE-1
+  statement: WHEN demand raises prices, THE SYSTEM SHALL include the increase in the upfront fare shown before confirming, with a notice that fares are higher due to demand, and SHALL NOT raise the fare after the rider confirms it (FARE-1 exceptions aside). The surge SHALL NOT exceed the lower of the platform cap (surge_cap_multiple, default 2x the normal fare) and any legal cap in the market. Both SHALL come from the market config (ridehailing.markets.yaml).
+  status: confirmed
+  revision: 4
+  required: true
+  rationale: Surge caps are regulated in some markets (Philippines regulator capped Grab at 1.5x then 2x in 2018; a December 2025 order cut surge by 50%, unverified).
+  source:
+    kind: stakeholder
+    ref: app owner, chat 2026-11-05 (as Uber)
+  decided_by: app owner (chandrafirst67)
+  decided_on: *id001
+  depends_on:
+  - FARE-1
+  - REQ-1
+  scenarios:
+  - kind: required
+    name: surge shown upfront
+    given: demand is high
+    when: rider opens the request screen
+    then: the higher total and a demand notice are shown before confirming
+  - kind: forbidden
+    name: surge added after confirming
+    given: rider confirmed an upfront fare
+    when: demand rises before the trip ends
+    then: the fare increases
+  check:
+    method: test
+    ref: tests/test_surge_fare.py
+    strength: sampled
+- id: REFUND-1
+  statement: WHEN a rider reports a fare charged in error, a trip that ended well short of the requested destination, or a trip the driver did not end in the app, THE SYSTEM SHALL review the report and, when it is upheld, refund the difference or the whole fare within the refund processing time (refund_process_hours, default 48). Reports SHALL be accepted within the reporting window (refund_report_days, default 30). Both SHALL come from the market config (ridehailing.markets.yaml).
+  status: confirmed
+  revision: 4
+  required: true
+  rationale: Grab Philippines refunds wrongly charged fees within 48 hours. The 30-day reporting window is Uber's; no Grab figure was found.
+  source:
+    kind: stakeholder
+    ref: app owner, chat 2026-11-05 (as Uber)
+  decided_by: app owner (chandrafirst67)
+  decided_on: *id001
+  scenarios:
+  - kind: required
+    name: upheld report refunded
+    given: rider reports an overcharge inside the window and it is upheld
+    when: the review finishes
+    then: rider is refunded the difference
+  - kind: forbidden
+    name: report after window ignored silently
+    given: rider reports after the window
+    when: the report is submitted
+    then: it is dropped with no reply
+  check:
+    method: test
+    ref: tests/test_refund_report.py
+    strength: sampled
+- id: TRIP-1
+  statement: WHEN a trip ends before the requested destination, or the driver goes offline mid-trip, THE SYSTEM SHALL charge only for the part completed, tell the rider, and keep the rider's safety information available. WHEN the driver fails to end a finished trip, THE SYSTEM SHALL end it automatically and SHALL NOT charge above the upfront fare because of it.
+  status: confirmed
+  revision: 2
+  required: true
+  rationale: Uber says drivers must end trips in the app, and riders have been overcharged when they do not. Partial-trip pricing and rider-safety handling (support contact, re-dispatch to finish the trip) are not decided.
+  source:
+    kind: stakeholder
+    ref: app owner, chat 2026-11-05 (as Uber)
+  decided_by: app owner (chandrafirst67)
+  decided_on: 2026-11-05
+  depends_on:
+  - FARE-1
+  scenarios:
+  - kind: required
+    name: partial trip charged partially
+    given: trip ended short of the destination
+    when: trip is closed
+    then: rider is charged only for the part completed
+  - kind: forbidden
+    name: overcharge from unended trip
+    given: driver reached the destination but did not end the trip
+    when: the fare is computed
+    then: rider is charged more than the upfront fare
+  check:
+    method: test
+    ref: tests/test_trip_end.py
+    strength: sampled
+- id: RATE-1
+  statement: WHEN a trip ends, THE SYSTEM SHALL let the rider and the driver each rate the other, and SHALL show a person only their own average. WHEN a rider's or driver's average is below the warning threshold (rating_warn, default 4.5) and stays below the review threshold (rating_review, default 4.2) on a 5-star scale, THE SYSTEM SHALL first notify them with tips to improve, and only then deactivate the account. A deactivated person SHALL be able to appeal. Both thresholds SHALL come from the market config (ridehailing.markets.yaml). The rating window SHALL also be a configuration value.
+  status: confirmed
+  revision: 4
+  required: false
+  rationale: Appeal added on 2026-11-05 (Grab has a passenger appeal form). The thresholds are not official.
+  source:
+    kind: stakeholder
+    ref: app owner, chat 2026-11-05 (as Uber)
+  decided_by: app owner (chandrafirst67)
+  decided_on: *id001
+  scenarios:
+  - kind: required
+    name: warned before deactivation
+    given: average is below the city threshold
+    when: the review runs
+    then: the person is notified in the app and given a chance to improve
+  - kind: forbidden
+    name: deactivated with no warning
+    given: average is below the city threshold and no warning was sent
+    when: the review runs
+    then: the account is deactivated
+  - kind: required
+    name: appeal available
+    given: an account was deactivated for a low rating
+    when: the person submits an appeal
+    then: the appeal is recorded and answered
+  check:
+    method: test
+    ref: tests/test_rating_warning.py
+    strength: sampled
+- id: SAFE-2
+  statement: DURING a trip, THE SYSTEM SHALL let the rider share live trip status with trusted contacts, SHALL give the rider an emergency SOS button that contacts local authorities or the rider's emergency contacts, and SHALL check on the rider when the trip stops unexpectedly for more than long_stop_minutes (default 5) or goes more than off_route_km (default 1 km) off-route. Both values SHALL come from the market config (ridehailing.markets.yaml).
+  status: confirmed
+  revision: 4
+  required: true
+  rationale: SOS button added on 2026-11-05 (Grab Safety Center). Who is alerted differs by country.
+  source:
+    kind: stakeholder
+    ref: app owner, chat 2026-11-05 (as Uber)
+  decided_by: app owner (chandrafirst67)
+  decided_on: *id001
+  scenarios:
+  - kind: required
+    name: share live trip
+    given: a trip in progress and a trusted contact
+    when: rider shares the trip
+    then: the contact can follow it live from a link
+  - kind: required
+    name: long unexpected stop
+    given: the trip stopped for longer than the configured time
+    when: the check triggers
+    then: the rider is asked if they are okay and offered help
+  - kind: forbidden
+    name: no help route
+    given: a trip in progress
+    when: rider looks for emergency help
+    then: no in-app way to reach emergency services exists
+  check:
+    method: test
+    ref: tests/test_trip_safety.py
+    strength: sampled
+- id: SAFE-3
+  statement: THE SYSTEM SHALL use a background-check provider and document-verification process that a named person has reviewed and judged adequate, and SHALL repeat that review every 6 months (configurable).
+  status: confirmed
+  revision: 1
+  required: true
+  rationale: Split from SAFE-1 on 2026-11-05. Whether the provider and process are adequate is a human judgment, so its check is a written review. Review every 6 months. The reviewer is still to be named.
+  source:
+    kind: stakeholder
+    ref: app owner, chat 2026-11-05
+  decided_by: app owner (chandrafirst67)
+  decided_on: 2026-11-05
+  depends_on:
+  - SAFE-1
+  scenarios:
+  - kind: required
+    name: provider reviewed
+    given: a background-check provider and verification process are in use
+    when: the scheduled review comes due
+    then: a named reviewer records a judgment of adequate or not adequate
+  - kind: forbidden
+    name: unreviewed provider
+    given: the review is overdue
+    when: new drivers are activated
+    then: they are activated with no review on record
+  check:
+    method: review
+    ref: reviews/driver_verification.md
+    strength: human
+- id: PRIV-1
+  statement: THE SYSTEM SHALL route calls and messages between rider and driver through the app so neither sees the other's real phone number, SHALL NOT show the driver the rider's personal details (name, phone number) before the driver accepts, and SHALL show a driver only a broader area, not exact pickup and drop-off addresses, in the driver's trip history after the trip.
+  status: confirmed
+  revision: 2
+  required: true
+  rationale: Hiding rider details before acceptance added on 2026-11-05 (Grab Philippines 2019 and Malaysia).
+  source:
+    kind: stakeholder
+    ref: app owner, chat 2026-11-05 (as Uber)
+  decided_by: app owner (chandrafirst67)
+  decided_on: *id001
+  scenarios:
+  - kind: required
+    name: masked call
+    given: a rider and a driver on an active trip
+    when: either calls or messages the other in the app
+    then: the other side sees an app-provided number, not the real one
+  - kind: forbidden
+    name: exact address in history
+    given: a completed trip
+    when: the driver opens their trip history
+    then: the exact pickup or drop-off address is shown
+  - kind: forbidden
+    name: details before accept
+    given: an open ride offer
+    when: the driver views it before accepting
+    then: the rider's name or phone number is shown
+  check:
+    method: test
+    ref: tests/test_privacy_masking.py
+    strength: sampled
+- id: MATCH-2
+  statement: WHEN a driver is offered a ride, THE SYSTEM SHALL give the driver 15 seconds to accept, and WHEN the driver declines or the time runs out, THE SYSTEM SHALL offer the ride to the next driver (MATCH-1 still applies). The accept time SHALL be a configuration value, default 15 seconds.
+  status: confirmed
+  revision: 1
+  required: true
+  rationale: Uber publishes no figure; third-party sources say about 10 to 15 seconds. Owner chose 15 seconds on 2026-11-05.
+  source:
+    kind: stakeholder
+    ref: app owner, chat 2026-11-05
+  decided_by: app owner (chandrafirst67)
+  decided_on: 2026-11-05
+  depends_on:
+  - MATCH-1
+  scenarios:
+  - kind: required
+    name: timeout passes the offer
+    given: a driver has an open offer
+    when: 15 seconds pass with no response
+    then: the offer closes for that driver and goes to the next one
+  - kind: forbidden
+    name: accept after timeout
+    given: the offer has timed out and gone to another driver
+    when: the first driver taps accept
+    then: the first driver is assigned the ride
+  check:
+    method: test
+    ref: tests/test_offer_timer.py
+    strength: bounded
+- id: MATCH-3
+  statement: WHEN a driver declines or ignores several offers in a row, THE SYSTEM SHALL take the driver offline for a short timeout. The number of offers and the timeout length SHALL be configuration values, defaults 3 offers and 5 minutes. A timeout SHALL NOT start for offers that closed because another driver was assigned.
+  status: confirmed
+  revision: 1
+  required: true
+  rationale: Uber can time out drivers who ignore requests (reports say 2 to 30 minutes by city) and the practice is criticised. Owner chose "short timeout" on 2026-11-05. The defaults 3 offers and 5 minutes are my assumptions, not Uber figures.
+  source:
+    kind: stakeholder
+    ref: app owner, chat 2026-11-05 (short timeout)
+  decided_by: app owner (chandrafirst67)
+  decided_on: 2026-11-05
+  depends_on:
+  - MATCH-2
+  scenarios:
+  - kind: required
+    name: repeated ignores
+    given: a driver ignores 3 offers in a row
+    when: the third offer times out
+    then: the driver is taken offline for the timeout
+  - kind: forbidden
+    name: timeout for a lost offer
+    given: an offer closed because another driver was assigned
+    when: the driver's streak is counted
+    then: that offer counts as ignored
+  check:
+    method: test
+    ref: tests/test_ignored_offers.py
+    strength: bounded
+- id: EARN-1
+  statement: THE SYSTEM SHALL keep the market's commission rate (commission_rate, default 20%) of each completed trip's fare, take no commission on cancellation or no-show fees (CANCEL-2, CANCEL-3), and pay the driver the remainder weekly, and SHALL offer an optional instant cash-out for a fee. The commission SHALL NOT exceed the legal maximum for the market (commission_legal_cap, for example 8% for two-wheelers in Indonesia from 2026-07-01). The rate, cap, payout day and cash-out fee SHALL come from the market config (ridehailing.markets.yaml). A cash trip's commission is collected under PAYM-1.
+  status: confirmed
+  revision: 2
+  required: true
+  rationale: Commission is per market. Indonesia capped it at 8% for two-wheelers from July 2026. Payout schedule for Grab was not researched.
+  source:
+    kind: stakeholder
+    ref: app owner, chat 2026-11-05
+  decided_by: app owner (chandrafirst67)
+  decided_on: *id001
+  depends_on:
+  - PAY-2
+  scenarios:
+  - kind: required
+    name: weekly payout
+    given: a driver completed trips during the week
+    when: the weekly payout runs
+    then: the driver receives fares minus 20% commission
+  - kind: forbidden
+    name: commission above legal cap
+    given: a market has a legal maximum commission
+    when: a trip is settled
+    then: commission above the maximum is taken
+  check:
+    method: test
+    ref: tests/test_commission_payout.py
+    strength: sampled
+- id: PAYM-1
+  statement: THE SYSTEM SHALL accept credit and debit cards, a wallet in the style of GrabPay, and cash where the market allows it (cash_enabled). WHEN a rider's card is expired or declined, THE SYSTEM SHALL ask for another method before a ride can be requested. WHEN a rider pays cash, THE SYSTEM SHALL place no hold, SHALL collect the commission from the driver's credit balance first and then the driver's cash wallet, and SHALL allow the credit balance to go to zero or below so the driver can keep accepting jobs. WHEN a rider does not pay a cash fare, THE SYSTEM SHALL let the driver report it, SHALL record the unpaid amount as owed by the rider, add it to the rider's next cash fare, and block new requests until it is cleared, and SHALL reimburse the driver's fare when the report is upheld.
+  status: proposed
+  revision: 1
+  rationale: Grab Philippines takes cash-trip commission from the driver's credit balance first, then the cash wallet, and lets the balance go to zero or negative. Grab Malaysia has drivers report 'My Passenger didn't pay'. Gojek adds an outstanding balance to the next cash fare. Reimbursing the driver is my assumption; Grab's exact rule was not found.
+  source:
+    kind: stakeholder
+    ref: app owner, chat 2026-11-05
+  depends_on:
+  - PAY-1
+  - PAY-2
+  - EARN-1
+  scenarios:
+  - kind: required
+    name: expired card
+    given: the rider's only method is an expired card
+    when: rider requests a ride
+    then: the request is blocked and the rider is asked for another method
+  - kind: required
+    name: cash trip
+    given: a trip paid in cash
+    when: the trip ends
+    then: the commission is recorded as owed by the driver
+  - kind: forbidden
+    name: hold on a cash trip
+    given: the rider chose cash
+    when: the rider requests a ride
+    then: a card hold is placed
+  - kind: forbidden
+    name: cash trip blocked by missing hold
+    given: a rider chose cash
+    when: the rider requests a ride
+    then: the request is refused because no hold could be placed
+- id: PROMO-1
+  statement: WHEN a rider enters a promo code before the trip, THE SYSTEM SHALL apply it to the base fare and fees but not to tips, SHALL honour any city limit on the code, and SHALL grant referral credit to a rider who invites a friend who completes a first trip. The platform SHALL bear the discount, so the driver's earnings are calculated on the full fare. Credit amounts and whether codes combine SHALL be configuration values.
+  status: proposed
+  revision: 1
+  rationale: Platform-bears-discount is my assumption; not decided. FARE-1 (d) lets a promo lower what the rider pays.
+  source:
+    kind: stakeholder
+    ref: app owner, chat 2026-11-05 (as Uber)
+  depends_on:
+  - FARE-1
+  - EARN-1
+  scenarios:
+  - kind: required
+    name: promo applied
+    given: a valid code entered before the trip
+    when: the trip ends
+    then: the discount applies to fare and fees and not to the tip
+  - kind: forbidden
+    name: code outside its city
+    given: a code limited to another city
+    when: rider enters it
+    then: the discount is applied
+- id: ACCESS-1
+  statement: THE SYSTEM SHALL let a rider flag that they travel with a service or assistance animal, SHALL treat a driver's refusal of such a rider as a violation that can end the driver's access, SHALL send the rider an in-app message when a driver cancels such a trip, and SHALL offer a wheelchair-accessible vehicle option.
+  status: proposed
+  revision: 1
+  rationale: Owner chose "as Uber" on 2026-11-05. Uber treats refusal as illegal and against policy, but news reports show drivers still cancel on riders with service dogs. How a refusal is detected, the penalty ladder, and where a wheelchair-accessible vehicle is available are not decided.
+  source:
+    kind: stakeholder
+    ref: app owner, chat 2026-11-05 (as Uber)
+  scenarios:
+  - kind: required
+    name: flagged animal cancel
+    given: a rider flagged an assistance animal
+    when: the driver cancels
+    then: the rider gets an in-app message and the cancel is reviewed
+  - kind: forbidden
+    name: no fee after refusal
+    given: a driver refused a rider with a service animal
+    when: the trip closes
+    then: the rider is charged any cancellation fee

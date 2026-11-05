@@ -1,0 +1,52 @@
+# Market parameters for ridehailing.rules.yaml.
+# The rules say WHAT must hold and name a parameter; this file says WHAT NUMBER applies in each market.
+# A market overrides `defaults`. `null` means: not researched, must be set before launch in that market.
+# Provenance is in the notes. Figures marked (unverified) came from news or secondary sources.
+
+defaults:
+  cash_enabled: true
+  cancel_grace_minutes: 5            # free cancel after a driver is assigned (Grab PH: 5)
+  noshow_wait_minutes: 5             # driver waits this long before a no-show cancel (not found for Grab; assumed)
+  cancel_fee_amount: null            # per market, local currency
+  cancel_fee_driver_share: 1.0       # Grab PH: 100% of the fee goes to the driver
+  surge_cap_multiple: 2.0            # platform cap; a legal cap in the market, if lower, wins
+  detour_threshold_percent: 30       # over estimated time or distance (platform choice; no Grab figure)
+  commission_rate: 0.20              # platform choice; legal cap in the market, if lower, wins
+  commission_legal_cap: null
+  payout_day: monday                 # platform choice
+  refund_report_days: 30             # Uber: 30 days; no Grab figure found
+  refund_process_hours: 48           # Grab PH: wrongly charged fees refunded within 48 hours
+  offer_accept_seconds: 15           # no official figure (unverified)
+  ignored_offers_before_timeout: 3   # platform choice
+  ignored_offer_timeout_minutes: 5   # platform choice
+  driver_cancel_warn_percent: 10     # Grab PH 2018 weekly rate (unverified for today)
+  driver_cancel_review_percent: 25   # platform choice
+  rating_warn: 4.5                   # not official (unverified)
+  rating_review: 4.2                 # not official (unverified)
+  long_stop_minutes: 5               # platform choice
+  off_route_km: 1.0                  # platform choice
+  destination_changes_per_trip: 1    # Grab PH: once per trip
+
+markets:
+  PH:
+    currency: PHP
+    cancel_fee_amount: 50            # Grab PH help page
+    surge_cap_multiple: 2.0          # regulator cap 2018; a Dec 2025 order cut surge by 50% (unverified, may have changed)
+  MY:
+    currency: MYR
+    cancel_fee_amount: 5             # Grab MY 2019 reports said RM3 to RM5 by ride type (unverified, taking the top)
+  SG:
+    currency: SGD
+    cancel_fee_amount: 4             # Grab SG 2019 (unverified for today)
+    cancel_grace_minutes: 5          # 3 minutes for shared rides (not modelled yet)
+  ID:
+    currency: IDR
+    commission_legal_cap: 0.08       # two-wheelers, from 2026-07-01 (news reports)
+    commission_rate: 0.08
+    cancel_fee_amount: null          # Gojek GoCar Rp3,000 is a reference, not a Grab figure
+  TH:
+    currency: THB
+    cancel_fee_amount: null
+  VN:
+    currency: VND
+    cancel_fee_amount: null
