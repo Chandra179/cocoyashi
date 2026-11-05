@@ -516,3 +516,86 @@ rules:
       method: review
       ref: reviews/driver_verification.md
       strength: human
+
+  - id: PRIV-1
+    statement: THE SYSTEM SHALL route calls and messages between rider and driver through the app so neither sees the other's real phone number, and SHALL show a driver only a broader area, not exact pickup and drop-off addresses, in the driver's trip history after the trip.
+    status: proposed
+    revision: 1
+    rationale: Owner chose "as Uber" on 2026-11-05. Uber masks phone numbers and obscures addresses in driver history. How long exact addresses are kept for safety and disputes is not decided.
+    source:
+      kind: stakeholder
+      ref: "app owner, chat 2026-11-05 (as Uber)"
+    scenarios:
+      - kind: required
+        name: masked call
+        given: a rider and a driver on an active trip
+        when: either calls or messages the other in the app
+        then: the other side sees an app-provided number, not the real one
+      - kind: forbidden
+        name: exact address in history
+        given: a completed trip
+        when: the driver opens their trip history
+        then: the exact pickup or drop-off address is shown
+
+  - id: MATCH-2
+    statement: WHEN a driver is offered a ride, THE SYSTEM SHALL give the driver 15 seconds to accept, and WHEN the driver declines or the time runs out, THE SYSTEM SHALL offer the ride to the next driver (MATCH-1 still applies). The accept time SHALL be a configuration value, default 15 seconds.
+    status: proposed
+    revision: 1
+    rationale: Uber publishes no figure; third-party sources say about 10 to 15 seconds. Owner chose 15 seconds on 2026-11-05.
+    source:
+      kind: stakeholder
+      ref: "app owner, chat 2026-11-05"
+    depends_on: [MATCH-1]
+    scenarios:
+      - kind: required
+        name: timeout passes the offer
+        given: a driver has an open offer
+        when: 15 seconds pass with no response
+        then: the offer closes for that driver and goes to the next one
+      - kind: forbidden
+        name: accept after timeout
+        given: the offer has timed out and gone to another driver
+        when: the first driver taps accept
+        then: the first driver is assigned the ride
+
+  - id: MATCH-3
+    statement: WHEN a driver declines or ignores several offers in a row, THE SYSTEM SHALL take the driver offline for a short timeout. The number of offers and the timeout length SHALL be configuration values, defaults 3 offers and 5 minutes. A timeout SHALL NOT start for offers that closed because another driver was assigned.
+    status: proposed
+    revision: 1
+    rationale: Uber can time out drivers who ignore requests (reports say 2 to 30 minutes by city) and the practice is criticised. Owner chose "short timeout" on 2026-11-05. The defaults 3 offers and 5 minutes are my assumptions, not Uber figures.
+    source:
+      kind: stakeholder
+      ref: "app owner, chat 2026-11-05 (short timeout)"
+    depends_on: [MATCH-2]
+    scenarios:
+      - kind: required
+        name: repeated ignores
+        given: a driver ignores 3 offers in a row
+        when: the third offer times out
+        then: the driver is taken offline for the timeout
+      - kind: forbidden
+        name: timeout for a lost offer
+        given: an offer closed because another driver was assigned
+        when: the driver's streak is counted
+        then: that offer counts as ignored
+
+  - id: EARN-1
+    statement: THE SYSTEM SHALL keep 20% of each completed trip's fare as commission and pay the remainder to the driver weekly, and SHALL offer an optional instant cash-out for a fee. The commission rate, payout day and instant cash-out fee SHALL be configuration values, settable per market. The commission SHALL NOT exceed any legal maximum for the market.
+    status: proposed
+    revision: 1
+    rationale: Owner chose 20% and weekly payout on 2026-11-05. Third-party sources put Uber's cut at roughly 25 to 30%, and Indonesia recently ordered a maximum commission of 8%, so the legal cap is a real constraint. Payout day and instant cash-out fee are not decided. PAY-2 already requires the driver be paid if the rider's payment fails.
+    source:
+      kind: stakeholder
+      ref: "app owner, chat 2026-11-05"
+    depends_on: [PAY-2]
+    scenarios:
+      - kind: required
+        name: weekly payout
+        given: a driver completed trips during the week
+        when: the weekly payout runs
+        then: the driver receives fares minus 20% commission
+      - kind: forbidden
+        name: commission above legal cap
+        given: a market has a legal maximum commission
+        when: a trip is settled
+        then: commission above the maximum is taken
