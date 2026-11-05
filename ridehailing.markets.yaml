@@ -25,6 +25,10 @@ defaults:
   rating_review: 4.2                 # not official (unverified)
   long_stop_minutes: 5               # platform choice
   off_route_km: 1.0                  # platform choice
+  fare_base: null                    # FARE-2 (proposed): local currency, must be set before launch
+  fare_per_km: null
+  fare_per_minute: null
+  fare_min: null
   destination_changes_per_trip: 1    # Grab PH: once per trip
   trip_location_retention_days: 365  # my default, not a legal figure
   breach_notice_hours: 72            # Indonesia PDP Law Art. 46

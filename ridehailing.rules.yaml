@@ -4,7 +4,7 @@ rules:
 - id: REQ-1
   statement: WHEN a rider requests a ride, THE SYSTEM SHALL show the fare estimate before the request is confirmed.
   status: confirmed
-  revision: 2
+  revision: 3
   required: true
   rationale: Standard practice; avoids surprise charges.
   source:
@@ -25,12 +25,12 @@ rules:
     then: request is blocked, not sent with an unknown fare
   check:
     method: test
-    ref: tests/test_estimate.py
+    ref: tests/estimate_test.go
     strength: sampled
 - id: REQ-2
   statement: WHEN a rider already has an active ride, THE SYSTEM SHALL reject a second ride request from that rider.
   status: confirmed
-  revision: 2
+  revision: 3
   required: true
   rationale: Prevents duplicate or overlapping trips; may be too strict (e.g. booking for a friend).
   source:
@@ -51,7 +51,7 @@ rules:
     then: rejected, existing ride unchanged
   check:
     method: test
-    ref: tests/test_active_ride.py
+    ref: tests/active_ride_test.go
     strength: sampled
 - id: MATCH-1
   statement: THE SYSTEM SHALL NOT offer one ride request to more than one driver at the same time.
@@ -82,7 +82,7 @@ rules:
 - id: CANCEL-1
   statement: WHEN a rider cancels before a driver is assigned, or within the free-cancel window (cancel_grace_minutes, default 5) after a driver is assigned, THE SYSTEM SHALL charge no cancellation fee. The window SHALL come from the market config for the rider's market (ridehailing.markets.yaml), not be hard-coded.
   status: confirmed
-  revision: 3
+  revision: 4
   required: true
   rationale: Switched from Uber (2 minutes) to Grab (5 minutes, Grab Philippines) on 2026-11-05, with the value per market.
   source:
@@ -108,12 +108,12 @@ rules:
     then: any fee is charged
   check:
     method: test
-    ref: tests/test_cancel_grace.py
+    ref: tests/cancel_grace_test.go
     strength: bounded
 - id: CANCEL-2
   statement: WHEN a rider cancels after the free-cancel window once a driver is assigned, THE SYSTEM SHALL charge the market's flat cancellation fee (cancel_fee_amount, in the market currency), show it before the rider confirms the cancel, and credit 100% of it to the driver with no commission taken. The amount SHALL come from the market config for the rider's market (ridehailing.markets.yaml).
   status: confirmed
-  revision: 3
+  revision: 4
   required: true
   rationale: 'Switched from a flat $5 to a per-market flat fee on 2026-11-05 (Grab PH: P50, 100% to the driver). Fee amounts for MY and SG are unverified; TH, VN and ID are unset.'
   source:
@@ -134,12 +134,12 @@ rules:
     then: cancel completes without first showing the fee
   check:
     method: test
-    ref: tests/test_cancel_fee.py
+    ref: tests/cancel_fee_test.go
     strength: bounded
 - id: PAY-1
   statement: WHEN a rider requests a ride paid by card or wallet, THE SYSTEM SHALL verify the payment method and hold the maximum possible fare, and WHEN the trip ends, THE SYSTEM SHALL charge the final fare once and release any unused part of the hold. A cash trip SHALL NOT place a hold (PAYM-1).
   status: confirmed
-  revision: 3
+  revision: 4
   required: true
   rationale: Grab holds an upper-bound amount and releases the excess. Cash trips are handled by PAYM-1.
   source:
@@ -160,12 +160,12 @@ rules:
     then: rider is charged a second time
   check:
     method: test
-    ref: tests/test_charge_once.py
+    ref: tests/charge_once_test.go
     strength: sampled
 - id: PAY-2
   statement: WHEN a card or wallet payment fails, THE SYSTEM SHALL record an outstanding balance on the rider and block new ride requests until it is paid, and THE SYSTEM SHALL still pay the driver the fare minus commission (EARN-1). An unpaid cash fare is handled by PAYM-1.
   status: confirmed
-  revision: 3
+  revision: 4
   required: true
   rationale: 'Clarified on 2026-11-05: ''paid in full'' means fare minus commission. Grab''s own policy on unpaid balances was not found.'
   source:
@@ -186,12 +186,12 @@ rules:
     then: driver receives nothing
   check:
     method: test
-    ref: tests/test_failed_payment.py
+    ref: tests/failed_payment_test.go
     strength: sampled
 - id: CANCEL-3
   statement: WHEN the driver has arrived and the rider has not shown up within the market's wait time (noshow_wait_minutes, default 5), THE SYSTEM SHALL let the driver cancel as a no-show and charge the rider the same fee as CANCEL-2, credited 100% to the driver with no commission taken. Wait time and fee SHALL come from the market config for the rider's market (ridehailing.markets.yaml).
   status: confirmed
-  revision: 3
+  revision: 4
   required: true
   rationale: Grab charges the same fee for no-shows. There is no separate waiting fee (removed from FARE-1 on 2026-11-05).
   source:
@@ -212,12 +212,12 @@ rules:
     then: rider is charged
   check:
     method: test
-    ref: tests/test_no_show_fee.py
+    ref: tests/no_show_fee_test.go
     strength: bounded
 - id: SAFE-1
   statement: THE SYSTEM SHALL NOT offer rides to a driver unless the driver has a valid driver license, valid vehicle documents (registration, insurance, inspection), a passed background check, and an ID and photo match, re-checked by selfie on login and at random times while the driver is online.
   status: confirmed
-  revision: 4
+  revision: 5
   required: true
   rationale: Random selfie checks during the day added on 2026-11-05 (Grab Philippines, September 2024). No Grab background-check detail was found.
   source:
@@ -248,12 +248,12 @@ rules:
     then: the driver keeps receiving ride offers
   check:
     method: test
-    ref: tests/test_driver_gating.py
+    ref: tests/driver_gating_test.go
     strength: sampled
 - id: FARE-1
   statement: THE SYSTEM SHALL charge the rider exactly the upfront fare shown before the request was confirmed (REQ-1), which may include surge (SURGE-1), except in these cases only. (a) WHEN the rider changes the destination or adds a stop in the app, where the market allows it and at most destination_changes_per_trip times (default once), THE SYSTEM SHALL show a new price including any surcharge and apply it only after the rider confirms it. (b) Actual tolls not in the estimate are added. (c) WHEN a trip ends before the requested destination or the driver goes offline, TRIP-1 applies and only the part completed is charged. (d) A promo discount (PROMO-1) lowers the amount the rider pays. (e) WHEN the rider changes the route without updating the app, or the route or duration differs beyond the detour threshold (detour_threshold_percent, default 30% over the estimated time or distance) because of the rider's changes, THE SYSTEM SHALL charge by actual time and distance. A detour caused by the driver SHALL NOT raise the fare. Thresholds SHALL come from the market config for the rider's market (ridehailing.markets.yaml).
   status: confirmed
-  revision: 4
+  revision: 5
   required: true
   rationale: 'Rewritten on 2026-11-05: waiting fee removed (Grab charges a no-show fee instead), TRIP-1 and promo exceptions added, driver-caused detours cannot raise the fare, destination change limited to once per trip (Grab PH).'
   source:
@@ -297,12 +297,12 @@ rules:
     then: the rider is charged more than the upfront fare
   check:
     method: test
-    ref: tests/test_upfront_fare.py
+    ref: tests/upfront_fare_test.go
     strength: sampled
 - id: DCANCEL-1
   statement: WHEN a driver cancels after accepting a ride, THE SYSTEM SHALL charge the rider no fee, SHALL automatically re-dispatch the request to the next available driver (MATCH-1 still applies), and SHALL tell the rider. The one exception is a no-show cancel under CANCEL-3, where the rider's fee applies and there is no re-dispatch.
   status: confirmed
-  revision: 3
+  revision: 4
   required: true
   rationale: Exception for CANCEL-3 added on 2026-11-05 to remove the contradiction between the two rules.
   source:
@@ -326,12 +326,12 @@ rules:
     then: rider is charged any fee
   check:
     method: test
-    ref: tests/test_driver_cancel.py
+    ref: tests/driver_cancel_test.go
     strength: sampled
 - id: DCANCEL-2
   statement: THE SYSTEM SHALL track each driver's cancellation rate (cancelled accepted rides out of accepted rides) and SHALL warn the driver, then deactivate the driver, WHEN the weekly rate is 10% or more (warning) and stays at 25% or more (deactivation review). Both limits SHALL be configuration values, defaults 10% and 25%, settable per city.
   status: confirmed
-  revision: 3
+  revision: 4
   required: false
   rationale: Uber's deactivation policy limits cancellation rate per city. Maximum, review window and warning steps are not decided. Whether the rate counts accepted or assigned trips is unsettled in sources.
   source:
@@ -352,12 +352,12 @@ rules:
     then: that cancel counts against the driver
   check:
     method: test
-    ref: tests/test_driver_cancel_rate.py
+    ref: tests/driver_cancel_rate_test.go
     strength: sampled
 - id: SURGE-1
   statement: WHEN demand raises prices, THE SYSTEM SHALL include the increase in the upfront fare shown before confirming, with a notice that fares are higher due to demand, and SHALL NOT raise the fare after the rider confirms it (FARE-1 exceptions aside). The surge SHALL NOT exceed the lower of the platform cap (surge_cap_multiple, default 2x the normal fare) and any legal cap in the market. Both SHALL come from the market config (ridehailing.markets.yaml).
   status: confirmed
-  revision: 4
+  revision: 5
   required: true
   rationale: Surge caps are regulated in some markets (Philippines regulator capped Grab at 1.5x then 2x in 2018; a December 2025 order cut surge by 50%, unverified).
   source:
@@ -381,12 +381,12 @@ rules:
     then: the fare increases
   check:
     method: test
-    ref: tests/test_surge_fare.py
+    ref: tests/surge_fare_test.go
     strength: sampled
 - id: REFUND-1
   statement: WHEN a rider reports a fare charged in error, a trip that ended well short of the requested destination, or a trip the driver did not end in the app, THE SYSTEM SHALL review the report and, when it is upheld, refund the difference or the whole fare within the refund processing time (refund_process_hours, default 48). Reports SHALL be accepted within the reporting window (refund_report_days, default 30). Both SHALL come from the market config (ridehailing.markets.yaml).
   status: confirmed
-  revision: 4
+  revision: 5
   required: true
   rationale: Grab Philippines refunds wrongly charged fees within 48 hours. The 30-day reporting window is Uber's; no Grab figure was found.
   source:
@@ -407,12 +407,12 @@ rules:
     then: it is dropped with no reply
   check:
     method: test
-    ref: tests/test_refund_report.py
+    ref: tests/refund_report_test.go
     strength: sampled
 - id: TRIP-1
   statement: WHEN a trip ends before the requested destination, or the driver goes offline mid-trip, THE SYSTEM SHALL charge only for the part completed, tell the rider, and keep the rider's safety information available. WHEN the driver fails to end a finished trip, THE SYSTEM SHALL end it automatically and SHALL NOT charge above the upfront fare because of it.
   status: confirmed
-  revision: 2
+  revision: 3
   required: true
   rationale: Uber says drivers must end trips in the app, and riders have been overcharged when they do not. Partial-trip pricing and rider-safety handling (support contact, re-dispatch to finish the trip) are not decided.
   source:
@@ -435,12 +435,12 @@ rules:
     then: rider is charged more than the upfront fare
   check:
     method: test
-    ref: tests/test_trip_end.py
+    ref: tests/trip_end_test.go
     strength: sampled
 - id: RATE-1
   statement: WHEN a trip ends, THE SYSTEM SHALL let the rider and the driver each rate the other, and SHALL show a person only their own average. WHEN a rider's or driver's average is below the warning threshold (rating_warn, default 4.5) and stays below the review threshold (rating_review, default 4.2) on a 5-star scale, THE SYSTEM SHALL first notify them with tips to improve, and only then deactivate the account. A deactivated person SHALL be able to appeal. Both thresholds SHALL come from the market config (ridehailing.markets.yaml). The rating window SHALL also be a configuration value.
   status: confirmed
-  revision: 4
+  revision: 5
   required: false
   rationale: Appeal added on 2026-11-05 (Grab has a passenger appeal form). The thresholds are not official.
   source:
@@ -466,12 +466,12 @@ rules:
     then: the appeal is recorded and answered
   check:
     method: test
-    ref: tests/test_rating_warning.py
+    ref: tests/rating_warning_test.go
     strength: sampled
 - id: SAFE-2
   statement: DURING a trip, THE SYSTEM SHALL let the rider share live trip status with trusted contacts, SHALL give the rider an emergency SOS button that contacts local authorities or the rider's emergency contacts, and SHALL check on the rider when the trip stops unexpectedly for more than long_stop_minutes (default 5) or goes more than off_route_km (default 1 km) off-route. Both values SHALL come from the market config (ridehailing.markets.yaml).
   status: confirmed
-  revision: 4
+  revision: 5
   required: true
   rationale: SOS button added on 2026-11-05 (Grab Safety Center). Who is alerted differs by country.
   source:
@@ -497,14 +497,14 @@ rules:
     then: no in-app way to reach emergency services exists
   check:
     method: test
-    ref: tests/test_trip_safety.py
+    ref: tests/trip_safety_test.go
     strength: sampled
 - id: SAFE-3
   statement: THE SYSTEM SHALL use a background-check provider and document-verification process that a named person has reviewed and judged adequate, and SHALL repeat that review every 6 months (configurable).
   status: confirmed
-  revision: 1
-  required: true
-  rationale: Split from SAFE-1 on 2026-11-05. Whether the provider and process are adequate is a human judgment, so its check is a written review. Review every 6 months. The reviewer is still to be named.
+  revision: 2
+  required: false
+  rationale: Split from SAFE-1 on 2026-11-05. Whether the provider and process are adequate is a human judgment, so its check is a written review. Review every 6 months. The reviewer is still to be named. MVP scope 2026-11-05, owner set required false so it does not block the MVP build; it remains a pre-launch gate before live rides in Indonesia.
   source:
     kind: stakeholder
     ref: app owner, chat 2026-11-05
@@ -530,7 +530,7 @@ rules:
 - id: PRIV-1
   statement: THE SYSTEM SHALL route calls and messages between rider and driver through the app so neither sees the other's real phone number, SHALL NOT show the driver the rider's personal details (name, phone number) before the driver accepts, and SHALL show a driver only a broader area, not exact pickup and drop-off addresses, in the driver's trip history after the trip.
   status: confirmed
-  revision: 2
+  revision: 3
   required: true
   rationale: Hiding rider details before acceptance added on 2026-11-05 (Grab Philippines 2019 and Malaysia).
   source:
@@ -556,12 +556,12 @@ rules:
     then: the rider's name or phone number is shown
   check:
     method: test
-    ref: tests/test_privacy_masking.py
+    ref: tests/privacy_masking_test.go
     strength: sampled
 - id: MATCH-2
   statement: WHEN a driver is offered a ride, THE SYSTEM SHALL give the driver 15 seconds to accept, and WHEN the driver declines or the time runs out, THE SYSTEM SHALL offer the ride to the next driver (MATCH-1 still applies). The accept time SHALL be a configuration value, default 15 seconds.
   status: confirmed
-  revision: 1
+  revision: 2
   required: true
   rationale: Uber publishes no figure; third-party sources say about 10 to 15 seconds. Owner chose 15 seconds on 2026-11-05.
   source:
@@ -584,12 +584,12 @@ rules:
     then: the first driver is assigned the ride
   check:
     method: test
-    ref: tests/test_offer_timer.py
+    ref: tests/offer_timer_test.go
     strength: bounded
 - id: MATCH-3
   statement: WHEN a driver declines or ignores several offers in a row, THE SYSTEM SHALL take the driver offline for a short timeout. The number of offers and the timeout length SHALL be configuration values, defaults 3 offers and 5 minutes. A timeout SHALL NOT start for offers that closed because another driver was assigned.
   status: confirmed
-  revision: 1
+  revision: 2
   required: true
   rationale: Uber can time out drivers who ignore requests (reports say 2 to 30 minutes by city) and the practice is criticised. Owner chose "short timeout" on 2026-11-05. The defaults 3 offers and 5 minutes are my assumptions, not Uber figures.
   source:
@@ -612,12 +612,12 @@ rules:
     then: that offer counts as ignored
   check:
     method: test
-    ref: tests/test_ignored_offers.py
+    ref: tests/ignored_offers_test.go
     strength: bounded
 - id: EARN-1
   statement: THE SYSTEM SHALL keep the market's commission rate (commission_rate, default 20%) of each completed trip's fare, take no commission on cancellation or no-show fees (CANCEL-2, CANCEL-3), and pay the driver the remainder weekly, and SHALL offer an optional instant cash-out for a fee. The commission SHALL NOT exceed the legal maximum for the market (commission_legal_cap, for example 8% for two-wheelers in Indonesia from 2026-07-01). The rate, cap, payout day and cash-out fee SHALL come from the market config (ridehailing.markets.yaml). A cash trip's commission is collected under PAYM-1.
   status: confirmed
-  revision: 2
+  revision: 3
   required: true
   rationale: Commission is per market. Indonesia capped it at 8% for two-wheelers from July 2026. Payout schedule for Grab was not researched.
   source:
@@ -640,12 +640,12 @@ rules:
     then: commission above the maximum is taken
   check:
     method: test
-    ref: tests/test_commission_payout.py
+    ref: tests/commission_payout_test.go
     strength: sampled
 - id: PAYM-1
   statement: THE SYSTEM SHALL accept credit and debit cards, a wallet in the style of GrabPay, and cash where the market allows it (cash_enabled). WHEN a rider's card is expired or declined, THE SYSTEM SHALL ask for another method before a ride can be requested. WHEN a rider pays cash, THE SYSTEM SHALL place no hold, SHALL collect the commission from the driver's credit balance first and then the driver's cash wallet, and SHALL allow the credit balance to go to zero or below so the driver can keep accepting jobs. WHEN a rider does not pay a cash fare, THE SYSTEM SHALL let the driver report it, SHALL record the unpaid amount as owed by the rider, add it to the rider's next cash fare, and block new requests until it is cleared, and SHALL reimburse the driver's fare when the report is upheld.
   status: confirmed
-  revision: 1
+  revision: 2
   rationale: Grab Philippines takes cash-trip commission from the driver's credit balance first, then the cash wallet, and lets the balance go to zero or negative. Grab Malaysia has drivers report 'My Passenger didn't pay'. Gojek adds an outstanding balance to the next cash fare. Reimbursing the driver is my assumption; Grab's exact rule was not found.
   source:
     kind: stakeholder
@@ -680,12 +680,12 @@ rules:
   decided_on: 2026-11-05
   check:
     method: test
-    ref: tests/test_payment_methods.py
+    ref: tests/payment_methods_test.go
     strength: sampled
 - id: PROMO-1
   statement: WHEN a rider enters a promo code before the trip, THE SYSTEM SHALL apply it to the base fare and fees but not to tips, SHALL honour any city limit on the code, and SHALL grant referral credit to a rider who invites a friend who completes a first trip. The platform SHALL bear the discount, so the driver's earnings are calculated on the full fare. Credit amounts and whether codes combine SHALL be configuration values.
   status: confirmed
-  revision: 1
+  revision: 2
   rationale: Platform-bears-discount is my assumption; not decided. FARE-1 (d) lets a promo lower what the rider pays.
   source:
     kind: stakeholder
@@ -709,12 +709,12 @@ rules:
   decided_on: 2026-11-05
   check:
     method: test
-    ref: tests/test_promo_codes.py
+    ref: tests/promo_codes_test.go
     strength: sampled
 - id: ACCESS-1
   statement: THE SYSTEM SHALL let a rider flag that they travel with a service or assistance animal, SHALL treat a driver's refusal of such a rider as a violation that can end the driver's access, SHALL send the rider an in-app message when a driver cancels such a trip, and SHALL offer a wheelchair-accessible vehicle option.
   status: confirmed
-  revision: 1
+  revision: 2
   rationale: Owner chose "as Uber" on 2026-11-05. Uber treats refusal as illegal and against policy, but news reports show drivers still cancel on riders with service dogs. How a refusal is detected, the penalty ladder, and where a wheelchair-accessible vehicle is available are not decided.
   source:
     kind: stakeholder
@@ -735,12 +735,12 @@ rules:
   decided_on: 2026-11-05
   check:
     method: test
-    ref: tests/test_assistance_animal.py
+    ref: tests/assistance_animal_test.go
     strength: sampled
 - id: ACCT-1
   statement: WHEN a person signs up as a rider, THE SYSTEM SHALL verify their phone number before the first ride request. WHEN a rider or driver account is suspended, THE SYSTEM SHALL tell them the reason and the suspension level, SHALL let them appeal, and SHALL answer the appeal within the appeal review time (appeal_review_working_days, default 14) before any permanent ban stands. The review time SHALL come from the market config (ridehailing.markets.yaml).
   status: confirmed
-  revision: 1
+  revision: 2
   rationale: 'Researched 2026-11-05. Grab Indonesia has a passenger appeal form; reported review time is 5 working days (website) to 7-14 working days (Grab''s social account), from consumer guides. Reported suspension triggers: login from another device, VPN, frequent cancellations, frequent name changes, repeated wrong OTP; some users say support gave no reason, so telling the reason is stricter than Grab''s reported practice. Grab says it never asks for an OTP. Phone verification is my assumption (OTP is used, but no official verification rule was found). Sources are older consumer guides and news.'
   source:
     kind: stakeholder
@@ -763,7 +763,7 @@ rules:
     then: no reason or appeal route is shown
   check:
     method: test
-    ref: tests/test_account_suspension.py
+    ref: tests/account_suspension_test.go
     strength: sampled
   required: true
   decided_by: app owner (chandrafirst67)
@@ -771,7 +771,7 @@ rules:
 - id: OUT-1
   statement: WHEN the rider's or driver's connection drops during a trip, THE SYSTEM SHALL keep the trip and its fare as they were and restore the state when the connection returns. WHEN the payment provider is unavailable at trip end, THE SYSTEM SHALL complete the trip, retry the charge later, and charge the rider at most once (PAY-1), and SHALL still pay the driver (PAY-2).
   status: confirmed
-  revision: 1
+  revision: 2
   rationale: Searched twice on 2026-11-05 (Grab and Gojek, Indonesian and English) and found nothing on connection loss or failed-payment retry; the only hits were generic payment-retry docs and 2017-2018 GrabPay outage news. Gojek and GoPay had an outage on 2026-07-28. This stays my default; it cannot be checked against Grab or Gojek policy.
   source:
     kind: stakeholder
@@ -797,7 +797,7 @@ rules:
     then: the rider is charged a second time
   check:
     method: test
-    ref: tests/test_outage_recovery.py
+    ref: tests/outage_recovery_test.go
     strength: sampled
   required: false
   decided_by: app owner (chandrafirst67)
@@ -805,8 +805,8 @@ rules:
 - id: LEGAL-1
   statement: THE SYSTEM SHALL confirm that each driver in a market where the law requires it has work-accident insurance (JKK) and health coverage (for Indonesia, BPJS Kesehatan) provided or registered by the platform, and SHALL NOT activate a driver for rides without it from the date the law takes effect. Whether the rule applies, and from when, SHALL come from the market config (ridehailing.markets.yaml).
   status: confirmed
-  revision: 1
-  rationale: 'Researched 2026-11-05. Presidential Regulation 27 of 2026 was signed on May Day (2026-05-01) and covers work-accident insurance, BPJS Kesehatan and other health insurance, with an 8% commission cap. Kontan reports it was formally published on 2026-10-07 with implementing rules due by 2026-12-31, and that the title changed to the Regulation on Protection of the Digital Platform-Based Transport Ecosystem. Drivers stay partners, not employees. Still unknown: the effective date and who pays the contributions (one source mentions a ''50% contribution discount''). Sources are news reports; check the official text on JDIH Setneg.'
+  revision: 2
+  rationale: 'Researched 2026-11-05. Presidential Regulation 27 of 2026 was signed on May Day (2026-05-01) and covers work-accident insurance, BPJS Kesehatan and other health insurance, with an 8% commission cap. Kontan reports it was formally published on 2026-10-07 with implementing rules due by 2026-12-31, and that the title changed to the Regulation on Protection of the Digital Platform-Based Transport Ecosystem. Drivers stay partners, not employees. Still unknown: the effective date and who pays the contributions (one source mentions a ''''50% contribution discount''''). Sources are news reports; check the official text on JDIH Setneg. MVP scope 2026-11-05, owner set required false so it does not block the MVP build; it remains a pre-launch gate before live rides in Indonesia.'
   source:
     kind: stakeholder
     ref: app owner, chat 2026-11-05 (confirm all seven; required flag from assistant suggestion, not stated by owner)
@@ -827,14 +827,14 @@ rules:
     method: review
     ref: reviews/insurance_compliance.md
     strength: human
-  required: true
+  required: false
   decided_by: app owner (chandrafirst67)
   decided_on: 2026-11-05
 - id: LEGAL-2
   statement: WHEN a trip ends, THE SYSTEM SHALL send the rider a receipt that shows the fare, tolls, fees, discount, tip, currency and payment method, and SHALL keep it available to the rider. Any tax shown, and any tax invoice (faktur pajak) the law requires, SHALL follow the market's rules from the market config (ridehailing.markets.yaml).
   status: confirmed
-  revision: 1
-  rationale: Researched 2026-11-05. No Indonesian rule on ride-hailing e-receipts was found. An academic paper argues ojek-online operators should issue tax invoices (faktur pajak) under the electronic tax invoice rules (PER-16/PJ/2014 as amended by PER-26/PJ/2017), and the 2019 head of BKPM said Gojek and Grab collect VAT (PPN), but the current PPN rate and any recent regulation were not found. Needs a tax adviser.
+  revision: 2
+  rationale: Researched 2026-11-05. No Indonesian rule on ride-hailing e-receipts was found. An academic paper argues ojek-online operators should issue tax invoices (faktur pajak) under the electronic tax invoice rules (PER-16/PJ/2014 as amended by PER-26/PJ/2017), and the 2019 head of BKPM said Gojek and Grab collect VAT (PPN), but the current PPN rate and any recent regulation were not found. Needs a tax adviser. MVP scope 2026-11-05, owner set required false so it does not block the MVP build; it remains a pre-launch gate before live rides in Indonesia.
   source:
     kind: stakeholder
     ref: app owner, chat 2026-11-05 (confirm all seven; required flag from assistant suggestion, not stated by owner)
@@ -854,16 +854,16 @@ rules:
     then: its total differs from the amount charged
   check:
     method: test
-    ref: tests/test_receipt.py
+    ref: tests/receipt_test.go
     strength: sampled
-  required: true
+  required: false
   decided_by: app owner (chandrafirst67)
   decided_on: 2026-11-05
 - id: DATA-1
   statement: WHEN a personal data protection failure is established, THE SYSTEM SHALL notify the affected people and the data protection authority within 72 hours (breach_notice_hours). WHEN a person asks to access or correct their data, to stop or limit its processing, or withdraws consent, THE SYSTEM SHALL act within 72 hours (subject_request_hours) after verifying who they are, and SHALL act on a deletion request within the time the law sets (default 72 hours until confirmed), subject to records the law requires the platform to keep. The deadlines SHALL come from the market config (ridehailing.markets.yaml).
   status: confirmed
-  revision: 1
-  rationale: Researched 2026-11-05. PDP Law (Law 27 of 2022) Article 46 sets a 72-hour breach notice. The same law sets 3x24 hours for correction (Article 30) and for access and stopping processing; I could not confirm a deadline for deletion in the law text. Kompas reports a circulating copy of Government Regulation 33 of 2026 (reportedly issued 2026-07-16) that repeats the 3x24-hour response time and requires identity verification first; the data protection authority had not been set up yet. Verify the text on JDIH or with local counsel.
+  revision: 2
+  rationale: Researched 2026-11-05. PDP Law (Law 27 of 2022) Article 46 sets a 72-hour breach notice. The same law sets 3x24 hours for correction (Article 30) and for access and stopping processing; I could not confirm a deadline for deletion in the law text. Kompas reports a circulating copy of Government Regulation 33 of 2026 (reportedly issued 2026-07-16) that repeats the 3x24-hour response time and requires identity verification first; the data protection authority had not been set up yet. Verify the text on JDIH or with local counsel. MVP scope 2026-11-05, owner set required false so it does not block the MVP build; it remains a pre-launch gate before live rides in Indonesia.
   source:
     kind: stakeholder
     ref: app owner, chat 2026-11-05 (confirm all seven; required flag from assistant suggestion, not stated by owner)
@@ -887,13 +887,13 @@ rules:
     method: review
     ref: reviews/data_protection.md
     strength: human
-  required: true
+  required: false
   decided_by: app owner (chandrafirst67)
   decided_on: 2026-11-05
 - id: DATA-2
   statement: THE SYSTEM SHALL keep exact trip locations only as long as needed for safety, disputes and the law (trip_location_retention_days, default 365), and SHALL then reduce them to a broad area (PRIV-1). WHEN a person deletes their account, THE SYSTEM SHALL remove or anonymize their personal data except records the law requires. The retention period SHALL come from the market config (ridehailing.markets.yaml).
   status: confirmed
-  revision: 1
+  revision: 2
   rationale: Researched 2026-11-05. Neither Grab's nor Gojek's privacy notice states a retention period for trip or location data. Grab says it stops keeping personal data through anonymisation or deletion when there is no legal or business need, and keeps law-enforcement documents for 3 months. 365 days is therefore still my default, not a platform or legal figure. Depends on DATA-1 and PRIV-1.
   source:
     kind: stakeholder
@@ -914,7 +914,7 @@ rules:
     then: personal data stays beyond what the law requires
   check:
     method: test
-    ref: tests/test_retention.py
+    ref: tests/retention_test.go
     strength: sampled
   required: false
   decided_by: app owner (chandrafirst67)
@@ -922,7 +922,7 @@ rules:
 - id: ADMIN-1
   statement: THE SYSTEM SHALL let support staff see exact trip addresses and contact details only for a case they have been assigned, SHALL record every such access with who, when and why, and SHALL NOT let support staff change a fare or refund outside the rules (REFUND-1) without a second person approving.
   status: confirmed
-  revision: 1
+  revision: 2
   rationale: Researched 2026-11-05. No public statement from Grab or Gojek on how support agents access trip data or whether access is logged. The closest finding is that Grab restricts law-enforcement request data to employees with a need to know, which is a different workflow. This stays my default for access control; consider checking security certifications (ISO 27001, SOC 2) if audit logging matters to you.
   source:
     kind: stakeholder
@@ -943,8 +943,76 @@ rules:
     then: exact addresses are shown
   check:
     method: test
-    ref: tests/test_support_access.py
+    ref: tests/support_access_test.go
     strength: sampled
   required: false
   decided_by: app owner (chandrafirst67)
   decided_on: 2026-11-05
+- id: FARE-2
+  statement: WHEN a rider asks for a fare estimate, THE SYSTEM SHALL calculate it as the base fare (base_fare) plus the per-kilometre rate (per_km_rate) times the route distance plus the per-minute rate (per_minute_rate) times the estimated time, raised to the minimum fare (min_fare) if lower, in the market currency and before any surge (SURGE-1), tolls or promo (PROMO-1). All four values SHALL come from the market config for the rider's market (ridehailing.markets.yaml), and a market with any of them unset SHALL NOT offer rides.
+  status: confirmed
+  revision: 1
+  required: true
+  rationale: 'Drafted 2026-11-05. No rule says how the fare shown in REQ-1 is calculated; FARE-1 only says it is charged unchanged. Base plus distance plus time with a minimum fare is the common ride-hailing structure. The rates are null in the market config and must be set before launch. Rounding to the currency unit (IDR has no minor unit) is not decided.'
+  source:
+    kind: stakeholder
+    ref: app owner, chat 2026-11-05 (confirmed as drafted; required flag from assistant draft)
+  depends_on:
+  - REQ-1
+  scenarios:
+  - kind: required
+    name: fare from distance and time
+    given: base 8000, 2500 per km, 400 per minute, minimum 12000
+    when: the route is 10 km and 20 minutes
+    then: the estimate is 8000 + 25000 + 8000 = 41000
+  - kind: required
+    name: minimum fare applies
+    given: the same rates
+    when: the route is 1 km and 3 minutes
+    then: the estimate is 12000, not 11700
+  - kind: forbidden
+    name: unset market offers rides
+    given: a market where per_km_rate is not set
+    when: a rider asks for an estimate
+    then: an estimate is shown
+  decided_by: app owner (chandrafirst67)
+  decided_on: 2026-11-05
+  check:
+    method: test
+    ref: tests/fare_calc_test.go
+    strength: sampled
+- id: MATCH-4
+  statement: WHEN every driver offered a ride has declined or timed out, or no driver is available nearby, THE SYSTEM SHALL end the request, tell the rider that no driver was found, charge no fee, and let the rider request again.
+  status: confirmed
+  revision: 1
+  required: true
+  rationale: 'Drafted 2026-11-05. MATCH-1 and MATCH-2 pass an offer to the next driver but nothing says what happens when there is none. Not decided: how many drivers or how long to try before giving up, and whether the system retries on its own.'
+  source:
+    kind: stakeholder
+    ref: app owner, chat 2026-11-05 (confirmed as drafted; required flag from assistant draft)
+  depends_on:
+  - MATCH-1
+  - MATCH-2
+  - REQ-2
+  scenarios:
+  - kind: required
+    name: all drivers pass
+    given: three nearby drivers who all decline or time out
+    when: the last offer closes
+    then: the rider is told no driver was found and no fee is charged
+  - kind: required
+    name: request again
+    given: a request that ended with no driver found
+    when: the rider requests again
+    then: a new request is created (REQ-2 does not block it)
+  - kind: forbidden
+    name: stuck request
+    given: no driver is available
+    when: the rider waits
+    then: the request stays open forever with no answer
+  decided_by: app owner (chandrafirst67)
+  decided_on: 2026-11-05
+  check:
+    method: test
+    ref: tests/offer_timer_test.go
+    strength: sampled
