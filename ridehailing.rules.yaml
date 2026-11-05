@@ -431,9 +431,9 @@ rules:
       strength: sampled
 
   - id: RATE-1
-    statement: WHEN a trip ends, THE SYSTEM SHALL let the rider and the driver each rate the other, and SHALL show a person only their own average. WHEN a rider's or driver's average stays below a configured per-city threshold, THE SYSTEM SHALL first notify them with tips to improve, and only then deactivate the account. The threshold and the rating window SHALL be configuration values.
+    statement: WHEN a trip ends, THE SYSTEM SHALL let the rider and the driver each rate the other, and SHALL show a person only their own average. WHEN a rider's or driver's average is below 4.5 (warning) and stays below 4.2 (deactivation review) on a 5-star scale, THE SYSTEM SHALL first notify them with tips to improve, and only then deactivate the account. Both thresholds SHALL be configuration values, defaults 4.5 and 4.2, settable per city. The rating window SHALL also be a configuration value.
     status: confirmed
-    revision: 2
+    revision: 3
     required: false
     rationale: Uber rates both sides and deactivates low-rated riders and drivers after warnings, with thresholds set per city. Uber does not publish the numbers (4.6 for drivers is from leaked documents, unconfirmed). Rating window not found.
     source:
@@ -458,9 +458,9 @@ rules:
       strength: sampled
 
   - id: SAFE-2
-    statement: DURING a trip, THE SYSTEM SHALL let the rider share live trip status with trusted contacts, shall give the rider an in-app way to call local emergency services, and SHALL check on the rider when the trip stops unexpectedly for a long time or goes far off-route.
+    statement: DURING a trip, THE SYSTEM SHALL let the rider share live trip status with trusted contacts, shall give the rider an in-app way to call local emergency services, and SHALL check on the rider when the trip stops unexpectedly for more than 5 minutes or goes more than 1 km off-route (both configuration values).
     status: confirmed
-    revision: 2
+    revision: 3
     required: true
     rationale: Uber offers Share My Trip, an emergency button and RideCheck, which varies by country. Long-stop time, off-route distance and who gets alerted are not decided.
     source:
@@ -490,13 +490,16 @@ rules:
       strength: sampled
 
   - id: SAFE-3
-    statement: THE SYSTEM SHALL use a background-check provider and document-verification process that a named person has reviewed and judged adequate, and SHALL repeat that review on a configured schedule.
-    status: proposed
+    statement: THE SYSTEM SHALL use a background-check provider and document-verification process that a named person has reviewed and judged adequate, and SHALL repeat that review every 6 months (configurable).
+    status: confirmed
     revision: 1
-    rationale: Split from SAFE-1 on 2026-11-05. Whether the provider and process are adequate is a human judgment, so its check is a written review. Review schedule and who reviews are not decided.
+    required: true
+    rationale: Split from SAFE-1 on 2026-11-05. Whether the provider and process are adequate is a human judgment, so its check is a written review. Review every 6 months. The reviewer is still to be named.
     source:
-      kind: inferred
-      ref: "split from SAFE-1, chat 2026-11-05"
+      kind: stakeholder
+      ref: "app owner, chat 2026-11-05"
+    decided_by: app owner (chandrafirst67)
+    decided_on: 2026-11-05
     depends_on: [SAFE-1]
     scenarios:
       - kind: required
