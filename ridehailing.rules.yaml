@@ -215,3 +215,24 @@ rules:
         given: any of license, vehicle documents, background check or ID/photo match is missing, failed or expired
         when: driver goes online
         then: driver receives a ride offer
+
+  - id: FARE-1
+    statement: THE SYSTEM SHALL charge the rider exactly the upfront fare shown before the request was confirmed (REQ-1), unless the rider changes the destination or route, or an exception rule says otherwise.
+    status: proposed
+    revision: 1
+    rationale: Owner chose an upfront fixed price (Uber-style) on 2026-11-05. Exceptions (destination change, extra stops, tolls, long waits) are not decided. Complements REQ-1 and PAY-1.
+    source:
+      kind: stakeholder
+      ref: "app owner, chat 2026-11-05 (upfront fixed price)"
+    depends_on: [REQ-1, PAY-1]
+    scenarios:
+      - kind: required
+        name: charged the estimate
+        given: rider confirmed a ride with an upfront fare and made no changes
+        when: trip ends
+        then: rider is charged exactly the upfront fare
+      - kind: forbidden
+        name: surprise overcharge
+        given: no destination or route change
+        when: trip takes longer or is longer than estimated
+        then: rider is charged more than the upfront fare
