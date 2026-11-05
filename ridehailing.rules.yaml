@@ -145,13 +145,16 @@ rules:
         then: rider is charged a second time
 
   - id: PAY-2
-    statement: WHEN a payment fails, THE SYSTEM SHALL record an outstanding balance on the rider and block new ride requests until it is paid, and the driver SHALL still be paid.
-    status: proposed
+    statement: WHEN a rider's payment fails, THE SYSTEM SHALL record an outstanding balance on the rider and block new ride requests until it is paid, and THE SYSTEM SHALL still pay the driver in full.
+    status: confirmed
     revision: 1
-    rationale: Modelled on Uber's typical handling of failed payments. Whether the driver is paid by the platform is an assumption.
+    required: true
+    rationale: Platform bears the loss; matches Uber, Grab and Gojek. Decided 2026-11-05.
     source:
-      kind: inferred
-      ref: "'what Uber does', chat 2026-11-05"
+      kind: stakeholder
+      ref: "app owner, chat 2026-11-05"
+    decided_by: app owner (chandrafirst67)
+    decided_on: 2026-11-05
     scenarios:
       - kind: required
         name: block after failed payment
@@ -163,15 +166,17 @@ rules:
         given: rider payment failed
         when: trip is settled
         then: driver receives nothing
-
   - id: CANCEL-3
-    statement: WHEN the driver has arrived and the rider does not show up within a waiting time, THE SYSTEM SHALL let the driver cancel and charge the rider a no-show fee. The waiting time and fee SHALL be configuration values.
-    status: proposed
+    statement: WHEN the driver has arrived and the rider has not shown up within 5 minutes, THE SYSTEM SHALL let the driver cancel and charge the rider the same flat fee as CANCEL-2 ($5), credited to the driver. The waiting time and fee SHALL be configuration values.
+    status: confirmed
     revision: 1
-    rationale: Uber, Grab and Gojek all charge a no-show fee. Waiting time, amount and whether it equals the CANCEL-2 fee are not decided.
+    required: true
+    rationale: Same fee as CANCEL-2. Decided 2026-11-05.
     source:
-      kind: inferred
-      ref: "Uber/Grab/Gojek research, chat 2026-11-05"
+      kind: stakeholder
+      ref: "app owner, chat 2026-11-05"
+    decided_by: app owner (chandrafirst67)
+    decided_on: 2026-11-05
     scenarios:
       - kind: required
         name: no-show fee
@@ -183,7 +188,30 @@ rules:
         given: driver arrived and waiting time has not passed
         when: driver cancels as no-show
         then: rider is charged
-
   - id: SAFE-1
-    statement: What must a driver have verified (license, vehicle, background check) before receiving rides?
-    status: open
+    statement: THE SYSTEM SHALL NOT offer rides to a driver unless the driver has a valid driver license, valid vehicle documents (registration, insurance, inspection), a passed background check, and an ID and photo match (re-checked by selfie on login).
+    status: confirmed
+    revision: 1
+    required: true
+    rationale: Rider safety. Decided 2026-11-05.
+    source:
+      kind: stakeholder
+      ref: "app owner, chat 2026-11-05"
+    decided_by: app owner (chandrafirst67)
+    decided_on: 2026-11-05
+    scenarios:
+      - kind: required
+        name: verified driver activated
+        given: driver has a valid license, vehicle documents, a passed background check and a matching ID/photo
+        when: driver goes online
+        then: driver can receive ride offers
+      - kind: required
+        name: selfie match on login
+        given: an activated driver logs in
+        when: the selfie does not match the ID photo
+        then: driver cannot go online
+      - kind: forbidden
+        name: unverified driver gets rides
+        given: any of license, vehicle documents, background check or ID/photo match is missing, failed or expired
+        when: driver goes online
+        then: driver receives a ride offer
