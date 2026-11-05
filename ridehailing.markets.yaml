@@ -26,6 +26,9 @@ defaults:
   long_stop_minutes: 5               # platform choice
   off_route_km: 1.0                  # platform choice
   destination_changes_per_trip: 1    # Grab PH: once per trip
+  trip_location_retention_days: 365  # my default, not a legal figure
+  breach_notice_hours: 72            # Indonesia PDP Law; deletion-request deadline unconfirmed
+  driver_insurance_required: false   # true where the law requires it
 
 markets:
   PH:
@@ -43,7 +46,8 @@ markets:
     currency: IDR
     commission_legal_cap: 0.08       # two-wheelers, from 2026-07-01 (news reports)
     commission_rate: 0.08
-    cancel_fee_amount: null          # Gojek GoCar Rp3,000 is a reference, not a Grab figure
+    driver_insurance_required: true  # Perpres 27/2026: work-accident insurance and BPJS Kesehatan (news reports; effective date unknown)
+    cancel_fee_amount: 3000          # picked from Gojek GoCar Rp3,000 (reported Feb 2026); no Grab Indonesia figure found (unverified)
   TH:
     currency: THB
     cancel_fee_amount: null

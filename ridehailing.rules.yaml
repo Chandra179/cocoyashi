@@ -737,3 +737,193 @@ rules:
     method: test
     ref: tests/test_assistance_animal.py
     strength: sampled
+- id: ACCT-1
+  statement: WHEN a person signs up as a rider, THE SYSTEM SHALL verify their phone number before the first ride request. WHEN a rider or driver account is suspended, THE SYSTEM SHALL tell them the reason and the suspension level, SHALL let them appeal, and SHALL review the appeal before any permanent ban stands.
+  status: proposed
+  revision: 1
+  rationale: 'Grab and Gojek in Indonesia use tiered suspensions and accept appeals (2017-2018 sources, older). Phone verification is my assumption: I found no current Grab or Gojek rider-verification rule. Overlaps RATE-1 and DCANCEL-2 appeals.'
+  source:
+    kind: inferred
+    ref: Indonesia ride-hailing suspension reports, chat 2026-11-05
+  scenarios:
+  - kind: required
+    name: unverified phone blocked
+    given: a rider with an unverified phone number
+    when: requests a ride
+    then: the request is refused until the number is verified
+  - kind: required
+    name: appeal reviewed
+    given: a suspended account
+    when: the person appeals
+    then: the appeal is recorded and answered before a permanent ban
+  - kind: forbidden
+    name: silent ban
+    given: an account is suspended
+    when: the person opens the app
+    then: no reason or appeal route is shown
+  check:
+    method: test
+    ref: tests/test_account_suspension.py
+    strength: sampled
+- id: OUT-1
+  statement: WHEN the rider's or driver's connection drops during a trip, THE SYSTEM SHALL keep the trip and its fare as they were and restore the state when the connection returns. WHEN the payment provider is unavailable at trip end, THE SYSTEM SHALL complete the trip, retry the charge later, and charge the rider at most once (PAY-1), and SHALL still pay the driver (PAY-2).
+  status: proposed
+  revision: 1
+  rationale: Nothing found on Grab or Gojek behavior; this is my default so a connection or payment outage does not strand a trip or cause a double charge. Gojek and GoPay had an outage on 2026-07-28, which shows this happens. Retry schedule is not decided.
+  source:
+    kind: inferred
+    ref: default for outages, chat 2026-11-05
+  depends_on:
+  - PAY-1
+  - PAY-2
+  scenarios:
+  - kind: required
+    name: trip survives dropout
+    given: a trip in progress
+    when: the connection drops and returns
+    then: the trip, route and fare are unchanged
+  - kind: required
+    name: payment retried
+    given: the payment provider is down at trip end
+    when: the provider returns
+    then: the rider is charged once
+  - kind: forbidden
+    name: double charge on retry
+    given: a charge succeeded but the response was lost
+    when: the retry runs
+    then: the rider is charged a second time
+  check:
+    method: test
+    ref: tests/test_outage_recovery.py
+    strength: sampled
+- id: LEGAL-1
+  statement: THE SYSTEM SHALL confirm that each driver in a market where the law requires it has work-accident insurance (JKK) and health coverage (for Indonesia, BPJS Kesehatan) provided or registered by the platform, and SHALL NOT activate a driver for rides without it. Whether a rule applies, and from when, SHALL come from the market config (ridehailing.markets.yaml).
+  status: proposed
+  revision: 1
+  rationale: Indonesia's Presidential Regulation 27 of 2026 (signed 2026-05-01) requires platforms to provide work-accident insurance and register drivers for BPJS Kesehatan. Sources are news reports; I did not find the regulation text, its effective date, or how the cost is split.
+  source:
+    kind: inferred
+    ref: Indonesia Presidential Regulation 27/2026 coverage, chat 2026-11-05
+  depends_on:
+  - SAFE-1
+  scenarios:
+  - kind: required
+    name: insured driver activated
+    given: a market requiring insurance and a driver with coverage
+    when: the driver goes online
+    then: the driver can receive offers
+  - kind: forbidden
+    name: uninsured driver online
+    given: a market requiring insurance and a driver without coverage
+    when: the driver goes online
+    then: the driver receives offers
+  check:
+    method: review
+    ref: reviews/insurance_compliance.md
+    strength: human
+- id: LEGAL-2
+  statement: WHEN a trip ends, THE SYSTEM SHALL send the rider a receipt that shows the fare, tolls, fees, discount, tip, currency and payment method, and SHALL keep it available to the rider. Any tax shown SHALL follow the market's rules from the market config (ridehailing.markets.yaml).
+  status: proposed
+  revision: 1
+  rationale: Standard practice; nothing researched on Indonesian receipt or tax requirements. Tax rate and invoice format are not decided.
+  source:
+    kind: inferred
+    ref: default for receipts, chat 2026-11-05
+  depends_on:
+  - FARE-1
+  - PAY-1
+  scenarios:
+  - kind: required
+    name: receipt sent
+    given: a completed trip
+    when: the trip ends
+    then: a receipt with all charge lines is available to the rider
+  - kind: forbidden
+    name: receipt total mismatch
+    given: a completed trip
+    when: the receipt is generated
+    then: its total differs from the amount charged
+  check:
+    method: test
+    ref: tests/test_receipt.py
+    strength: sampled
+- id: DATA-1
+  statement: WHEN a personal data protection failure is established, THE SYSTEM SHALL notify the affected people and the data protection authority within 72 hours. WHEN a person asks to access, correct, or delete their data or withdraws consent, THE SYSTEM SHALL act within 72 hours after verifying who they are, subject to records the law requires the platform to keep. The deadlines SHALL come from the market config (ridehailing.markets.yaml).
+  status: proposed
+  revision: 1
+  rationale: Indonesia's Personal Data Protection Law (Law 27 of 2022) sets a 72-hour breach notice; sources disagree on the 72-hour deadline for deletion requests, so treat it as unconfirmed and check with local counsel. Applies to Indonesia only for now.
+  source:
+    kind: inferred
+    ref: Indonesia PDP Law summaries, chat 2026-11-05
+  scenarios:
+  - kind: required
+    name: breach notice on time
+    given: a breach is established
+    when: 72 hours pass
+    then: people and the authority have been notified
+  - kind: required
+    name: request handled
+    given: a verified person asks for deletion
+    when: 72 hours pass
+    then: the data is deleted or the legal reason to keep it is recorded
+  - kind: forbidden
+    name: unverified request
+    given: a request from an unverified person
+    when: the request arrives
+    then: data is deleted or disclosed
+  check:
+    method: review
+    ref: reviews/data_protection.md
+    strength: human
+- id: DATA-2
+  statement: THE SYSTEM SHALL keep exact trip locations only as long as needed for safety, disputes and the law (trip_location_retention_days, default 365), and SHALL then reduce them to a broad area (PRIV-1). WHEN a person deletes their account, THE SYSTEM SHALL remove or anonymize their personal data except records the law requires. The retention period SHALL come from the market config (ridehailing.markets.yaml).
+  status: proposed
+  revision: 1
+  rationale: Uber's retention is unclear in sources (exact addresses were once kept indefinitely in driver history). 365 days is my default, not a legal or platform figure. Depends on DATA-1 and PRIV-1.
+  source:
+    kind: inferred
+    ref: default for retention, chat 2026-11-05
+  depends_on:
+  - DATA-1
+  - PRIV-1
+  scenarios:
+  - kind: required
+    name: locations reduced
+    given: a trip older than the retention period
+    when: the retention job runs
+    then: exact locations are reduced to a broad area
+  - kind: forbidden
+    name: kept forever
+    given: a deleted account
+    when: the retention job runs
+    then: personal data stays beyond what the law requires
+  check:
+    method: test
+    ref: tests/test_retention.py
+    strength: sampled
+- id: ADMIN-1
+  statement: THE SYSTEM SHALL let support staff see exact trip addresses and contact details only for a case they have been assigned, SHALL record every such access with who, when and why, and SHALL NOT let support staff change a fare or refund outside the rules (REFUND-1) without a second person approving.
+  status: proposed
+  revision: 1
+  rationale: Closes the gap between PRIV-1 (drivers see broad areas) and REFUND-1 (reviews need details). Nothing researched about Grab or Gojek internals; this is my default for access control. The approval threshold is not decided.
+  source:
+    kind: inferred
+    ref: default for support access, chat 2026-11-05
+  depends_on:
+  - PRIV-1
+  - REFUND-1
+  scenarios:
+  - kind: required
+    name: assigned case access
+    given: a support agent assigned to a dispute
+    when: opens the trip
+    then: the access is allowed and logged with the reason
+  - kind: forbidden
+    name: browse any trip
+    given: a support agent with no assigned case
+    when: opens a trip
+    then: exact addresses are shown
+  check:
+    method: test
+    ref: tests/test_support_access.py
+    strength: sampled
