@@ -72,8 +72,9 @@ rules:
 
   - id: CANCEL-1
     statement: WHEN a rider cancels before a driver accepts, or within a short grace period of 2 minutes after a driver accepts, THE SYSTEM SHALL charge no cancellation fee. The grace period length SHALL be a configuration value, not hard-coded.
-    status: proposed
+    status: confirmed
     revision: 1
+    required: true
     rationale: Modelled on Uber's typical policy. The grace length is an assumption; Uber varies it by market.
     source:
       kind: stakeholder
@@ -99,8 +100,9 @@ rules:
 
   - id: CANCEL-2
     statement: WHEN a rider cancels after the grace period once a driver is assigned, THE SYSTEM SHALL charge a flat cancellation fee of $5, paid to the driver, and show the fee to the rider before they confirm the cancel. The fee amount SHALL be a configuration value, not hard-coded.
-    status: proposed
+    status: confirmed
     revision: 1
+    required: true
     rationale: Modelled on Uber's typical policy. The fee amount and whether it varies by market are not decided.
     source:
       kind: stakeholder
@@ -121,8 +123,9 @@ rules:
 
   - id: PAY-1
     statement: WHEN a rider requests a ride, THE SYSTEM SHALL verify the payment method and hold the estimated fare, and WHEN the trip ends, THE SYSTEM SHALL charge the final fare.
-    status: proposed
+    status: confirmed
     revision: 1
+    required: true
     rationale: Modelled on Uber's typical flow (pre-authorize at request, charge at end of trip). Not decided whether a hold or only a card check is used.
     source:
       kind: stakeholder
@@ -160,6 +163,26 @@ rules:
         given: rider payment failed
         when: trip is settled
         then: driver receives nothing
+
+  - id: CANCEL-3
+    statement: WHEN the driver has arrived and the rider does not show up within a waiting time, THE SYSTEM SHALL let the driver cancel and charge the rider a no-show fee. The waiting time and fee SHALL be configuration values.
+    status: proposed
+    revision: 1
+    rationale: Uber, Grab and Gojek all charge a no-show fee. Waiting time, amount and whether it equals the CANCEL-2 fee are not decided.
+    source:
+      kind: inferred
+      ref: "Uber/Grab/Gojek research, chat 2026-11-05"
+    scenarios:
+      - kind: required
+        name: no-show fee
+        given: driver arrived and waiting time has passed
+        when: driver cancels as no-show
+        then: rider is charged the fee, credited to the driver
+      - kind: forbidden
+        name: early no-show
+        given: driver arrived and waiting time has not passed
+        when: driver cancels as no-show
+        then: rider is charged
 
   - id: SAFE-1
     statement: What must a driver have verified (license, vehicle, background check) before receiving rides?
