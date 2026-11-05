@@ -71,13 +71,15 @@ rules:
         then: only one is assigned
 
   - id: CANCEL-1
-    statement: WHEN a rider cancels before a driver accepts, or within a short grace period (Uber-style, assumed 2 minutes) after a driver accepts, THE SYSTEM SHALL charge no cancellation fee.
+    statement: WHEN a rider cancels before a driver accepts, or within a short grace period of 2 minutes after a driver accepts, THE SYSTEM SHALL charge no cancellation fee. The grace period length SHALL be a configuration value, not hard-coded.
     status: proposed
     revision: 1
     rationale: Modelled on Uber's typical policy. The grace length is an assumption; Uber varies it by market.
     source:
-      kind: inferred
-      ref: "'what Uber does', chat 2026-11-05"
+      kind: stakeholder
+      ref: "app owner, chat 2026-11-05 (grace period 2 minutes, configurable)"
+    decided_by: app owner (chandrafirst67)
+    decided_on: 2026-11-05
     scenarios:
       - kind: required
         name: free cancel before acceptance
@@ -96,13 +98,15 @@ rules:
         then: any fee is charged
 
   - id: CANCEL-2
-    statement: WHEN a rider cancels after the grace period once a driver is assigned, THE SYSTEM SHALL charge a flat cancellation fee, paid to the driver, and show the fee to the rider before they confirm the cancel.
+    statement: WHEN a rider cancels after the grace period once a driver is assigned, THE SYSTEM SHALL charge a flat cancellation fee of $5, paid to the driver, and show the fee to the rider before they confirm the cancel. The fee amount SHALL be a configuration value, not hard-coded.
     status: proposed
     revision: 1
     rationale: Modelled on Uber's typical policy. The fee amount and whether it varies by market are not decided.
     source:
-      kind: inferred
-      ref: "'what Uber does', chat 2026-11-05"
+      kind: stakeholder
+      ref: "app owner, chat 2026-11-05 (flat $5, configurable)"
+    decided_by: app owner (chandrafirst67)
+    decided_on: 2026-11-05
     scenarios:
       - kind: required
         name: late cancel fee
@@ -121,8 +125,10 @@ rules:
     revision: 1
     rationale: Modelled on Uber's typical flow (pre-authorize at request, charge at end of trip). Not decided whether a hold or only a card check is used.
     source:
-      kind: inferred
-      ref: "'what Uber does', chat 2026-11-05"
+      kind: stakeholder
+      ref: "app owner, chat 2026-11-05 (confirmed as proposed; values configurable)"
+    decided_by: app owner (chandrafirst67)
+    decided_on: 2026-11-05
     scenarios:
       - kind: required
         name: charge at trip end
