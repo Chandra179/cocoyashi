@@ -249,3 +249,44 @@ rules:
         given: no change by the rider and the trip is within the detour threshold
         when: trip takes longer than estimated
         then: rider is charged more than the upfront fare
+
+  - id: DCANCEL-1
+    statement: WHEN a driver cancels after accepting a ride, THE SYSTEM SHALL charge the rider no fee and SHALL automatically re-dispatch the request to the next available driver (MATCH-1 still applies), and SHALL tell the rider.
+    status: proposed
+    revision: 1
+    rationale: Owner asked for Uber's behavior on 2026-11-05. Uber re-dispatches without a fee when the driver cancels. If the driver cancelled after waiting at pickup past the wait time, that is a no-show and CANCEL-3 applies instead.
+    source:
+      kind: inferred
+      ref: "Uber developer docs (dispatch and cancellation), chat 2026-11-05"
+    depends_on: [MATCH-1, CANCEL-3]
+    scenarios:
+      - kind: required
+        name: driver cancels early
+        given: driver accepted and has not waited the full wait time at pickup
+        when: driver cancels
+        then: rider is not charged and the request is offered to the next driver
+      - kind: forbidden
+        name: rider fee for driver cancel
+        given: driver cancelled before the no-show wait time
+        when: the ride is closed
+        then: rider is charged any fee
+
+  - id: DCANCEL-2
+    statement: THE SYSTEM SHALL track each driver's cancellation rate (cancelled accepted rides out of accepted rides) and SHALL warn the driver, then deactivate the driver, WHEN the rate stays above a configured per-city maximum. The maximum SHALL be a configuration value.
+    status: proposed
+    revision: 1
+    rationale: Uber's deactivation policy limits cancellation rate per city. Maximum, review window and warning steps are not decided. Whether the rate counts accepted or assigned trips is unsettled in sources.
+    source:
+      kind: inferred
+      ref: "Uber deactivation policy, chat 2026-11-05"
+    scenarios:
+      - kind: required
+        name: rate above limit
+        given: driver cancellation rate stays above the city maximum
+        when: the review runs
+        then: driver is warned, then deactivated if it continues
+      - kind: forbidden
+        name: no-show cancels counted
+        given: a driver cancels because the rider did not show up within the wait time
+        when: the rate is computed
+        then: that cancel counts against the driver
