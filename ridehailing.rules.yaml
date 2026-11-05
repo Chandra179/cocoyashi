@@ -738,10 +738,10 @@ rules:
     ref: tests/test_assistance_animal.py
     strength: sampled
 - id: ACCT-1
-  statement: WHEN a person signs up as a rider, THE SYSTEM SHALL verify their phone number before the first ride request. WHEN a rider or driver account is suspended, THE SYSTEM SHALL tell them the reason and the suspension level, SHALL let them appeal, and SHALL review the appeal before any permanent ban stands.
+  statement: WHEN a person signs up as a rider, THE SYSTEM SHALL verify their phone number before the first ride request. WHEN a rider or driver account is suspended, THE SYSTEM SHALL tell them the reason and the suspension level, SHALL let them appeal, and SHALL answer the appeal within the appeal review time (appeal_review_working_days, default 14) before any permanent ban stands. The review time SHALL come from the market config (ridehailing.markets.yaml).
   status: proposed
   revision: 1
-  rationale: 'Grab and Gojek in Indonesia use tiered suspensions and accept appeals (2017-2018 sources, older). Phone verification is my assumption: I found no current Grab or Gojek rider-verification rule. Overlaps RATE-1 and DCANCEL-2 appeals.'
+  rationale: 'Researched 2026-11-05. Grab Indonesia has a passenger appeal form; reported review time is 5 working days (website) to 7-14 working days (Grab''s social account), from consumer guides. Reported suspension triggers: login from another device, VPN, frequent cancellations, frequent name changes, repeated wrong OTP; some users say support gave no reason, so telling the reason is stricter than Grab''s reported practice. Grab says it never asks for an OTP. Phone verification is my assumption (OTP is used, but no official verification rule was found). Sources are older consumer guides and news.'
   source:
     kind: inferred
     ref: Indonesia ride-hailing suspension reports, chat 2026-11-05
@@ -769,7 +769,7 @@ rules:
   statement: WHEN the rider's or driver's connection drops during a trip, THE SYSTEM SHALL keep the trip and its fare as they were and restore the state when the connection returns. WHEN the payment provider is unavailable at trip end, THE SYSTEM SHALL complete the trip, retry the charge later, and charge the rider at most once (PAY-1), and SHALL still pay the driver (PAY-2).
   status: proposed
   revision: 1
-  rationale: Nothing found on Grab or Gojek behavior; this is my default so a connection or payment outage does not strand a trip or cause a double charge. Gojek and GoPay had an outage on 2026-07-28, which shows this happens. Retry schedule is not decided.
+  rationale: Searched twice on 2026-11-05 (Grab and Gojek, Indonesian and English) and found nothing on connection loss or failed-payment retry; the only hits were generic payment-retry docs and 2017-2018 GrabPay outage news. Gojek and GoPay had an outage on 2026-07-28. This stays my default; it cannot be checked against Grab or Gojek policy.
   source:
     kind: inferred
     ref: default for outages, chat 2026-11-05
@@ -797,10 +797,10 @@ rules:
     ref: tests/test_outage_recovery.py
     strength: sampled
 - id: LEGAL-1
-  statement: THE SYSTEM SHALL confirm that each driver in a market where the law requires it has work-accident insurance (JKK) and health coverage (for Indonesia, BPJS Kesehatan) provided or registered by the platform, and SHALL NOT activate a driver for rides without it. Whether a rule applies, and from when, SHALL come from the market config (ridehailing.markets.yaml).
+  statement: THE SYSTEM SHALL confirm that each driver in a market where the law requires it has work-accident insurance (JKK) and health coverage (for Indonesia, BPJS Kesehatan) provided or registered by the platform, and SHALL NOT activate a driver for rides without it from the date the law takes effect. Whether the rule applies, and from when, SHALL come from the market config (ridehailing.markets.yaml).
   status: proposed
   revision: 1
-  rationale: Indonesia's Presidential Regulation 27 of 2026 (signed 2026-05-01) requires platforms to provide work-accident insurance and register drivers for BPJS Kesehatan. Sources are news reports; I did not find the regulation text, its effective date, or how the cost is split.
+  rationale: 'Researched 2026-11-05. Presidential Regulation 27 of 2026 was signed on May Day (2026-05-01) and covers work-accident insurance, BPJS Kesehatan and other health insurance, with an 8% commission cap. Kontan reports it was formally published on 2026-10-07 with implementing rules due by 2026-12-31, and that the title changed to the Regulation on Protection of the Digital Platform-Based Transport Ecosystem. Drivers stay partners, not employees. Still unknown: the effective date and who pays the contributions (one source mentions a ''50% contribution discount''). Sources are news reports; check the official text on JDIH Setneg.'
   source:
     kind: inferred
     ref: Indonesia Presidential Regulation 27/2026 coverage, chat 2026-11-05
@@ -822,10 +822,10 @@ rules:
     ref: reviews/insurance_compliance.md
     strength: human
 - id: LEGAL-2
-  statement: WHEN a trip ends, THE SYSTEM SHALL send the rider a receipt that shows the fare, tolls, fees, discount, tip, currency and payment method, and SHALL keep it available to the rider. Any tax shown SHALL follow the market's rules from the market config (ridehailing.markets.yaml).
+  statement: WHEN a trip ends, THE SYSTEM SHALL send the rider a receipt that shows the fare, tolls, fees, discount, tip, currency and payment method, and SHALL keep it available to the rider. Any tax shown, and any tax invoice (faktur pajak) the law requires, SHALL follow the market's rules from the market config (ridehailing.markets.yaml).
   status: proposed
   revision: 1
-  rationale: Standard practice; nothing researched on Indonesian receipt or tax requirements. Tax rate and invoice format are not decided.
+  rationale: Researched 2026-11-05. No Indonesian rule on ride-hailing e-receipts was found. An academic paper argues ojek-online operators should issue tax invoices (faktur pajak) under the electronic tax invoice rules (PER-16/PJ/2014 as amended by PER-26/PJ/2017), and the 2019 head of BKPM said Gojek and Grab collect VAT (PPN), but the current PPN rate and any recent regulation were not found. Needs a tax adviser.
   source:
     kind: inferred
     ref: default for receipts, chat 2026-11-05
@@ -848,10 +848,10 @@ rules:
     ref: tests/test_receipt.py
     strength: sampled
 - id: DATA-1
-  statement: WHEN a personal data protection failure is established, THE SYSTEM SHALL notify the affected people and the data protection authority within 72 hours. WHEN a person asks to access, correct, or delete their data or withdraws consent, THE SYSTEM SHALL act within 72 hours after verifying who they are, subject to records the law requires the platform to keep. The deadlines SHALL come from the market config (ridehailing.markets.yaml).
+  statement: WHEN a personal data protection failure is established, THE SYSTEM SHALL notify the affected people and the data protection authority within 72 hours (breach_notice_hours). WHEN a person asks to access or correct their data, to stop or limit its processing, or withdraws consent, THE SYSTEM SHALL act within 72 hours (subject_request_hours) after verifying who they are, and SHALL act on a deletion request within the time the law sets (default 72 hours until confirmed), subject to records the law requires the platform to keep. The deadlines SHALL come from the market config (ridehailing.markets.yaml).
   status: proposed
   revision: 1
-  rationale: Indonesia's Personal Data Protection Law (Law 27 of 2022) sets a 72-hour breach notice; sources disagree on the 72-hour deadline for deletion requests, so treat it as unconfirmed and check with local counsel. Applies to Indonesia only for now.
+  rationale: Researched 2026-11-05. PDP Law (Law 27 of 2022) Article 46 sets a 72-hour breach notice. The same law sets 3x24 hours for correction (Article 30) and for access and stopping processing; I could not confirm a deadline for deletion in the law text. Kompas reports a circulating copy of Government Regulation 33 of 2026 (reportedly issued 2026-07-16) that repeats the 3x24-hour response time and requires identity verification first; the data protection authority had not been set up yet. Verify the text on JDIH or with local counsel.
   source:
     kind: inferred
     ref: Indonesia PDP Law summaries, chat 2026-11-05
@@ -879,7 +879,7 @@ rules:
   statement: THE SYSTEM SHALL keep exact trip locations only as long as needed for safety, disputes and the law (trip_location_retention_days, default 365), and SHALL then reduce them to a broad area (PRIV-1). WHEN a person deletes their account, THE SYSTEM SHALL remove or anonymize their personal data except records the law requires. The retention period SHALL come from the market config (ridehailing.markets.yaml).
   status: proposed
   revision: 1
-  rationale: Uber's retention is unclear in sources (exact addresses were once kept indefinitely in driver history). 365 days is my default, not a legal or platform figure. Depends on DATA-1 and PRIV-1.
+  rationale: Researched 2026-11-05. Neither Grab's nor Gojek's privacy notice states a retention period for trip or location data. Grab says it stops keeping personal data through anonymisation or deletion when there is no legal or business need, and keeps law-enforcement documents for 3 months. 365 days is therefore still my default, not a platform or legal figure. Depends on DATA-1 and PRIV-1.
   source:
     kind: inferred
     ref: default for retention, chat 2026-11-05
@@ -905,7 +905,7 @@ rules:
   statement: THE SYSTEM SHALL let support staff see exact trip addresses and contact details only for a case they have been assigned, SHALL record every such access with who, when and why, and SHALL NOT let support staff change a fare or refund outside the rules (REFUND-1) without a second person approving.
   status: proposed
   revision: 1
-  rationale: Closes the gap between PRIV-1 (drivers see broad areas) and REFUND-1 (reviews need details). Nothing researched about Grab or Gojek internals; this is my default for access control. The approval threshold is not decided.
+  rationale: Researched 2026-11-05. No public statement from Grab or Gojek on how support agents access trip data or whether access is logged. The closest finding is that Grab restricts law-enforcement request data to employees with a need to know, which is a different workflow. This stays my default for access control; consider checking security certifications (ISO 27001, SOC 2) if audit logging matters to you.
   source:
     kind: inferred
     ref: default for support access, chat 2026-11-05

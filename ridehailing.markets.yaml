@@ -27,7 +27,10 @@ defaults:
   off_route_km: 1.0                  # platform choice
   destination_changes_per_trip: 1    # Grab PH: once per trip
   trip_location_retention_days: 365  # my default, not a legal figure
-  breach_notice_hours: 72            # Indonesia PDP Law; deletion-request deadline unconfirmed
+  breach_notice_hours: 72            # Indonesia PDP Law Art. 46
+  subject_request_hours: 72          # PDP Law 3x24h for access, correction, stopping processing; deletion deadline unconfirmed
+  appeal_review_working_days: 14     # Grab ID reports 5 to 14 working days (consumer guides)
+  insurance_effective_date: null     # Perpres 27/2026: effective date not found
   driver_insurance_required: false   # true where the law requires it
 
 markets:
