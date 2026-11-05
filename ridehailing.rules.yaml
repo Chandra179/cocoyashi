@@ -644,12 +644,12 @@ rules:
     strength: sampled
 - id: PAYM-1
   statement: THE SYSTEM SHALL accept credit and debit cards, a wallet in the style of GrabPay, and cash where the market allows it (cash_enabled). WHEN a rider's card is expired or declined, THE SYSTEM SHALL ask for another method before a ride can be requested. WHEN a rider pays cash, THE SYSTEM SHALL place no hold, SHALL collect the commission from the driver's credit balance first and then the driver's cash wallet, and SHALL allow the credit balance to go to zero or below so the driver can keep accepting jobs. WHEN a rider does not pay a cash fare, THE SYSTEM SHALL let the driver report it, SHALL record the unpaid amount as owed by the rider, add it to the rider's next cash fare, and block new requests until it is cleared, and SHALL reimburse the driver's fare when the report is upheld.
-  status: proposed
+  status: confirmed
   revision: 1
   rationale: Grab Philippines takes cash-trip commission from the driver's credit balance first, then the cash wallet, and lets the balance go to zero or negative. Grab Malaysia has drivers report 'My Passenger didn't pay'. Gojek adds an outstanding balance to the next cash fare. Reimbursing the driver is my assumption; Grab's exact rule was not found.
   source:
     kind: stakeholder
-    ref: app owner, chat 2026-11-05
+    ref: app owner, chat 2026-11-05 (confirm all three; required flag set from assistant suggestion, not stated by owner)
   depends_on:
   - PAY-1
   - PAY-2
@@ -675,14 +675,21 @@ rules:
     given: a rider chose cash
     when: the rider requests a ride
     then: the request is refused because no hold could be placed
+  required: true
+  decided_by: app owner (chandrafirst67)
+  decided_on: 2026-11-05
+  check:
+    method: test
+    ref: tests/test_payment_methods.py
+    strength: sampled
 - id: PROMO-1
   statement: WHEN a rider enters a promo code before the trip, THE SYSTEM SHALL apply it to the base fare and fees but not to tips, SHALL honour any city limit on the code, and SHALL grant referral credit to a rider who invites a friend who completes a first trip. The platform SHALL bear the discount, so the driver's earnings are calculated on the full fare. Credit amounts and whether codes combine SHALL be configuration values.
-  status: proposed
+  status: confirmed
   revision: 1
   rationale: Platform-bears-discount is my assumption; not decided. FARE-1 (d) lets a promo lower what the rider pays.
   source:
     kind: stakeholder
-    ref: app owner, chat 2026-11-05 (as Uber)
+    ref: app owner, chat 2026-11-05 (confirm all three; required flag set from assistant suggestion, not stated by owner)
   depends_on:
   - FARE-1
   - EARN-1
@@ -697,14 +704,21 @@ rules:
     given: a code limited to another city
     when: rider enters it
     then: the discount is applied
+  required: false
+  decided_by: app owner (chandrafirst67)
+  decided_on: 2026-11-05
+  check:
+    method: test
+    ref: tests/test_promo_codes.py
+    strength: sampled
 - id: ACCESS-1
   statement: THE SYSTEM SHALL let a rider flag that they travel with a service or assistance animal, SHALL treat a driver's refusal of such a rider as a violation that can end the driver's access, SHALL send the rider an in-app message when a driver cancels such a trip, and SHALL offer a wheelchair-accessible vehicle option.
-  status: proposed
+  status: confirmed
   revision: 1
   rationale: Owner chose "as Uber" on 2026-11-05. Uber treats refusal as illegal and against policy, but news reports show drivers still cancel on riders with service dogs. How a refusal is detected, the penalty ladder, and where a wheelchair-accessible vehicle is available are not decided.
   source:
     kind: stakeholder
-    ref: app owner, chat 2026-11-05 (as Uber)
+    ref: app owner, chat 2026-11-05 (confirm all three; required flag set from assistant suggestion, not stated by owner)
   scenarios:
   - kind: required
     name: flagged animal cancel
@@ -716,3 +730,10 @@ rules:
     given: a driver refused a rider with a service animal
     when: the trip closes
     then: the rider is charged any cancellation fee
+  required: true
+  decided_by: app owner (chandrafirst67)
+  decided_on: 2026-11-05
+  check:
+    method: test
+    ref: tests/test_assistance_animal.py
+    strength: sampled
