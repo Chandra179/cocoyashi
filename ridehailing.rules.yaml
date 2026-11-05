@@ -71,12 +71,89 @@ rules:
         then: only one is assigned
 
   - id: CANCEL-1
-    statement: Can a rider cancel for free, and until when? Is there a fee after a driver is assigned or arrives?
-    status: open
+    statement: WHEN a rider cancels before a driver accepts, or within a short grace period (Uber-style, assumed 2 minutes) after a driver accepts, THE SYSTEM SHALL charge no cancellation fee.
+    status: proposed
+    revision: 1
+    rationale: Modelled on Uber's typical policy. The grace length is an assumption; Uber varies it by market.
+    source:
+      kind: inferred
+      ref: "'what Uber does', chat 2026-11-05"
+    scenarios:
+      - kind: required
+        name: free cancel before acceptance
+        given: no driver has accepted the request
+        when: rider cancels
+        then: request is cancelled and no fee is charged
+      - kind: required
+        name: free cancel inside grace period
+        given: a driver accepted less than the grace period ago
+        when: rider cancels
+        then: no fee is charged
+      - kind: forbidden
+        name: fee inside free window
+        given: no driver assigned, or still inside the grace period
+        when: rider cancels
+        then: any fee is charged
+
+  - id: CANCEL-2
+    statement: WHEN a rider cancels after the grace period once a driver is assigned, THE SYSTEM SHALL charge a flat cancellation fee, paid to the driver, and show the fee to the rider before they confirm the cancel.
+    status: proposed
+    revision: 1
+    rationale: Modelled on Uber's typical policy. The fee amount and whether it varies by market are not decided.
+    source:
+      kind: inferred
+      ref: "'what Uber does', chat 2026-11-05"
+    scenarios:
+      - kind: required
+        name: late cancel fee
+        given: driver assigned and grace period has passed
+        when: rider confirms the cancel
+        then: flat fee is charged and credited to the driver
+      - kind: forbidden
+        name: hidden fee
+        given: a fee will apply
+        when: rider taps cancel
+        then: cancel completes without first showing the fee
 
   - id: PAY-1
-    statement: When is the rider charged (at request, at end of trip), and what happens if payment fails?
-    status: open
+    statement: WHEN a rider requests a ride, THE SYSTEM SHALL verify the payment method and hold the estimated fare, and WHEN the trip ends, THE SYSTEM SHALL charge the final fare.
+    status: proposed
+    revision: 1
+    rationale: Modelled on Uber's typical flow (pre-authorize at request, charge at end of trip). Not decided whether a hold or only a card check is used.
+    source:
+      kind: inferred
+      ref: "'what Uber does', chat 2026-11-05"
+    scenarios:
+      - kind: required
+        name: charge at trip end
+        given: trip completed with a valid payment method
+        when: trip ends
+        then: final fare is charged once
+      - kind: forbidden
+        name: double charge
+        given: trip completed and already charged
+        when: charge is retried
+        then: rider is charged a second time
+
+  - id: PAY-2
+    statement: WHEN a payment fails, THE SYSTEM SHALL record an outstanding balance on the rider and block new ride requests until it is paid, and the driver SHALL still be paid.
+    status: proposed
+    revision: 1
+    rationale: Modelled on Uber's typical handling of failed payments. Whether the driver is paid by the platform is an assumption.
+    source:
+      kind: inferred
+      ref: "'what Uber does', chat 2026-11-05"
+    scenarios:
+      - kind: required
+        name: block after failed payment
+        given: rider has an unpaid balance
+        when: rider requests a ride
+        then: request is rejected with a prompt to pay
+      - kind: forbidden
+        name: driver unpaid
+        given: rider payment failed
+        when: trip is settled
+        then: driver receives nothing
 
   - id: SAFE-1
     statement: What must a driver have verified (license, vehicle, background check) before receiving rides?
