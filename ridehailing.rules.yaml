@@ -299,12 +299,15 @@ rules:
 
   - id: SURGE-1
     statement: WHEN demand raises prices, THE SYSTEM SHALL include the increase in the upfront fare shown before confirming, with a notice that fares are higher due to demand, and SHALL NOT raise the fare after the rider confirms it (FARE-1 exceptions aside). A maximum surge cap SHALL be a configuration value.
-    status: proposed
+    status: confirmed
     revision: 1
+    required: true
     rationale: Uber folds surge into one upfront price instead of showing a multiplier. A surge cap and an emergency cap are not decided.
     source:
-      kind: inferred
-      ref: "Uber upfront pricing coverage (2016), chat 2026-11-05"
+      kind: stakeholder
+      ref: "app owner, chat 2026-11-05 (as Uber)"
+    decided_by: app owner (chandrafirst67)
+    decided_on: 2026-11-05
     depends_on: [FARE-1, REQ-1]
     scenarios:
       - kind: required
@@ -320,12 +323,15 @@ rules:
 
   - id: REFUND-1
     statement: WHEN a rider reports a fare charged in error, a trip that ended well short of the requested destination, or a trip the driver did not end in the app, THE SYSTEM SHALL review the report and refund the difference or the whole fare when it is upheld. The reporting window and what counts as short of the destination SHALL be configuration values.
-    status: proposed
+    status: confirmed
     revision: 1
+    required: true
     rationale: Uber's refund policy lists these cases (page last modified 2020, may be outdated). A 30-day window appears only in third-party sources and is unverified.
     source:
-      kind: inferred
-      ref: "Uber refund policy, chat 2026-11-05"
+      kind: stakeholder
+      ref: "app owner, chat 2026-11-05 (as Uber)"
+    decided_by: app owner (chandrafirst67)
+    decided_on: 2026-11-05
     scenarios:
       - kind: required
         name: upheld report refunded
@@ -340,12 +346,15 @@ rules:
 
   - id: TRIP-1
     statement: WHEN a trip ends before the requested destination, or the driver goes offline mid-trip, THE SYSTEM SHALL charge only for the part completed, tell the rider, and keep the rider's safety information available. WHEN the driver fails to end a finished trip, THE SYSTEM SHALL end it automatically and SHALL NOT charge above the upfront fare because of it.
-    status: proposed
+    status: confirmed
     revision: 1
+    required: true
     rationale: Uber says drivers must end trips in the app, and riders have been overcharged when they do not. Partial-trip pricing and rider-safety handling (support contact, re-dispatch to finish the trip) are not decided.
     source:
-      kind: inferred
-      ref: "Uber refund policy and reported cases, chat 2026-11-05"
+      kind: stakeholder
+      ref: "app owner, chat 2026-11-05 (as Uber)"
+    decided_by: app owner (chandrafirst67)
+    decided_on: 2026-11-05
     depends_on: [FARE-1]
     scenarios:
       - kind: required
@@ -358,3 +367,48 @@ rules:
         given: driver reached the destination but did not end the trip
         when: the fare is computed
         then: rider is charged more than the upfront fare
+
+  - id: RATE-1
+    statement: WHEN a trip ends, THE SYSTEM SHALL let the rider and the driver each rate the other, and SHALL show a person only their own average. WHEN a rider's or driver's average stays below a configured per-city threshold, THE SYSTEM SHALL first notify them with tips to improve, and only then deactivate the account. The threshold and the rating window SHALL be configuration values.
+    status: proposed
+    revision: 1
+    rationale: Uber rates both sides and deactivates low-rated riders and drivers after warnings, with thresholds set per city. Uber does not publish the numbers (4.6 for drivers is from leaked documents, unconfirmed). Rating window not found.
+    source:
+      kind: inferred
+      ref: "Uber rider deactivation announcement (2019), chat 2026-11-05"
+    scenarios:
+      - kind: required
+        name: warned before deactivation
+        given: average is below the city threshold
+        when: the review runs
+        then: the person is notified in the app and given a chance to improve
+      - kind: forbidden
+        name: deactivated with no warning
+        given: average is below the city threshold and no warning was sent
+        when: the review runs
+        then: the account is deactivated
+
+  - id: SAFE-2
+    statement: DURING a trip, THE SYSTEM SHALL let the rider share live trip status with trusted contacts, shall give the rider an in-app way to call local emergency services, and SHALL check on the rider when the trip stops unexpectedly for a long time or goes far off-route.
+    status: proposed
+    revision: 1
+    rationale: Uber offers Share My Trip, an emergency button and RideCheck, which varies by country. Long-stop time, off-route distance and who gets alerted are not decided.
+    source:
+      kind: inferred
+      ref: "Uber safety pages, chat 2026-11-05"
+    scenarios:
+      - kind: required
+        name: share live trip
+        given: a trip in progress and a trusted contact
+        when: rider shares the trip
+        then: the contact can follow it live from a link
+      - kind: required
+        name: long unexpected stop
+        given: the trip stopped for longer than the configured time
+        when: the check triggers
+        then: the rider is asked if they are okay and offered help
+      - kind: forbidden
+        name: no help route
+        given: a trip in progress
+        when: rider looks for emergency help
+        then: no in-app way to reach emergency services exists
