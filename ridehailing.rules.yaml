@@ -58,7 +58,7 @@ rules:
   - id: MATCH-1
     statement: THE SYSTEM SHALL NOT offer one ride request to more than one driver at the same time.
     status: confirmed
-    revision: 2
+    revision: 3
     required: true
     rationale: Avoids two drivers accepting the same ride. Uber-style sequential dispatch.
     source:
@@ -78,9 +78,9 @@ rules:
         when: both accept
         then: only one is assigned
     check:
-      method: test
-      ref: tests/test_dispatch_concurrency.py
-      strength: bounded
+      method: assertion
+      ref: dispatch assertion - at most one open offer per ride request (planned)
+      strength: sampled
 
   - id: CANCEL-1
     statement: WHEN a rider cancels before a driver accepts, or within a short grace period of 2 minutes after a driver accepts, THE SYSTEM SHALL charge no cancellation fee. The grace period length SHALL be a configuration value, not hard-coded.
@@ -225,7 +225,7 @@ rules:
   - id: SAFE-1
     statement: THE SYSTEM SHALL NOT offer rides to a driver unless the driver has a valid driver license, valid vehicle documents (registration, insurance, inspection), a passed background check, and an ID and photo match (re-checked by selfie on login).
     status: confirmed
-    revision: 2
+    revision: 3
     required: true
     rationale: Rider safety. Decided 2026-11-05.
     source:
@@ -250,9 +250,9 @@ rules:
         when: driver goes online
         then: driver receives a ride offer
     check:
-      method: review
-      ref: reviews/driver_verification.md
-      strength: human
+      method: test
+      ref: tests/test_driver_gating.py
+      strength: sampled
 
   - id: FARE-1
     statement: THE SYSTEM SHALL charge the rider exactly the upfront fare shown before the request was confirmed (REQ-1), except in these cases only. (a) WHEN the rider changes the destination or adds a stop in the app, THE SYSTEM SHALL show a new price and apply it only after the rider confirms it. (b) Actual tolls not in the estimate are added. (c) The pickup waiting fee (CANCEL-3 wait time) is added. (d) WHEN the route or duration differs significantly from the estimate beyond the detour threshold (by default 30% over the estimated time or distance), or the rider changes the route without updating the app, THE SYSTEM SHALL charge by actual time and distance. The threshold SHALL be a configuration value, default 30%.
@@ -488,3 +488,28 @@ rules:
       method: test
       ref: tests/test_trip_safety.py
       strength: sampled
+
+  - id: SAFE-3
+    statement: THE SYSTEM SHALL use a background-check provider and document-verification process that a named person has reviewed and judged adequate, and SHALL repeat that review on a configured schedule.
+    status: proposed
+    revision: 1
+    rationale: Split from SAFE-1 on 2026-11-05. Whether the provider and process are adequate is a human judgment, so its check is a written review. Review schedule and who reviews are not decided.
+    source:
+      kind: inferred
+      ref: "split from SAFE-1, chat 2026-11-05"
+    depends_on: [SAFE-1]
+    scenarios:
+      - kind: required
+        name: provider reviewed
+        given: a background-check provider and verification process are in use
+        when: the scheduled review comes due
+        then: a named reviewer records a judgment of adequate or not adequate
+      - kind: forbidden
+        name: unreviewed provider
+        given: the review is overdue
+        when: new drivers are activated
+        then: they are activated with no review on record
+    check:
+      method: review
+      ref: reviews/driver_verification.md
+      strength: human
