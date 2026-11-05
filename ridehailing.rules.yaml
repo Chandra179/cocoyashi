@@ -370,12 +370,15 @@ rules:
 
   - id: RATE-1
     statement: WHEN a trip ends, THE SYSTEM SHALL let the rider and the driver each rate the other, and SHALL show a person only their own average. WHEN a rider's or driver's average stays below a configured per-city threshold, THE SYSTEM SHALL first notify them with tips to improve, and only then deactivate the account. The threshold and the rating window SHALL be configuration values.
-    status: proposed
+    status: confirmed
     revision: 1
+    required: false
     rationale: Uber rates both sides and deactivates low-rated riders and drivers after warnings, with thresholds set per city. Uber does not publish the numbers (4.6 for drivers is from leaked documents, unconfirmed). Rating window not found.
     source:
-      kind: inferred
-      ref: "Uber rider deactivation announcement (2019), chat 2026-11-05"
+      kind: stakeholder
+      ref: "app owner, chat 2026-11-05 (as Uber)"
+    decided_by: app owner (chandrafirst67)
+    decided_on: 2026-11-05
     scenarios:
       - kind: required
         name: warned before deactivation
@@ -390,12 +393,15 @@ rules:
 
   - id: SAFE-2
     statement: DURING a trip, THE SYSTEM SHALL let the rider share live trip status with trusted contacts, shall give the rider an in-app way to call local emergency services, and SHALL check on the rider when the trip stops unexpectedly for a long time or goes far off-route.
-    status: proposed
+    status: confirmed
     revision: 1
+    required: true
     rationale: Uber offers Share My Trip, an emergency button and RideCheck, which varies by country. Long-stop time, off-route distance and who gets alerted are not decided.
     source:
-      kind: inferred
-      ref: "Uber safety pages, chat 2026-11-05"
+      kind: stakeholder
+      ref: "app owner, chat 2026-11-05 (as Uber)"
+    decided_by: app owner (chandrafirst67)
+    decided_on: 2026-11-05
     scenarios:
       - kind: required
         name: share live trip
