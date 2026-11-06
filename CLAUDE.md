@@ -15,6 +15,8 @@ python3 <tools>/check_rules.py ridehailing.rules.yaml
 
 ## How the repo works
 
+**Current state:** `ride/` and `tests/` were removed in commit `b66ee9e`, so the repo is spec-only for now. The paths below describe the layout to rebuild test-first; every `check.ref` is a planned file until it exists, and `go test ./...` has nothing to run.
+
 The rules come first and the code follows them.
 
 - `ridehailing.rules.yaml` is the source of truth: each rule has a statement, scenarios (at least one required and one forbidden), a `check` pointing at a test file, and who decided it. Rule IDs (REQ-1, CANCEL-2, ...) appear in code comments.
